@@ -68,6 +68,7 @@ export interface TuneList {
 export interface Riddim {
   id: number;
   name: string;
+  slug: string;
   url: string | null;
   year: number | null;
   summary: string | null;
@@ -76,6 +77,24 @@ export interface Riddim {
   versions: (Ref & { year: number | null })[];
   producers: Ref[];
   counts: { tunes: number | null; tunes_including_versions: number | null; versions: number | null };
+}
+
+/** Artist / producer / label record (for page headers). */
+export interface Entity {
+  id: number;
+  name: string;
+  slug: string;
+  url: string | null;
+  /** person | group | band (people only) */
+  kind: string | null;
+  country: string | null;
+  founded_year: number | null;
+  founded_place: string | null;
+}
+
+/** Data a server-rendered page hands to the app, keyed by the /api path it stands in for. */
+export interface SsrData {
+  api: Record<string, unknown>;
 }
 
 export interface ApiError {

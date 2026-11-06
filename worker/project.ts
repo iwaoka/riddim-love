@@ -2,7 +2,7 @@
 // Defensive on purpose: unknown/missing fields become null instead of crashing,
 // so an upstream change degrades the display rather than breaking it.
 
-import type { NameHit, NameHitType, Ref, Riddim, RiddimRef, Tune, TuneHit } from '../shared/types';
+import type { Entity, NameHit, NameHitType, Ref, Riddim, RiddimRef, Tune, TuneHit } from '../shared/types';
 
 type Raw = Record<string, unknown>;
 
@@ -82,6 +82,26 @@ export function tuneHit(v: unknown): TuneHit | null {
   return { id, title, year: int(v.year), artists: refs(v.artists), riddim: riddimRef(v.riddim) };
 }
 
+/** Person (artist/producer) or label record → Entity. */
+export function entity(v: unknown, role: 'artist' | 'producer' | 'label'): Entity | null {
+  const r = ref(v);
+  if (!r || !isObj(v)) return null;
+  // People have one url per role; the plain `url` is the role this endpoint represents.
+  const urls = isObj(v.urls) ? v.urls : {};
+  const url = riddimUrl(role === 'label' ? v.url : (urls[role] ?? v.url));
+  const slug = str(v.slug);
+  return {
+    id: r.id,
+    name: r.name,
+    slug: slug && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ? slug : '',
+    url,
+    kind: str(v.type),
+    country: str(v.country_code),
+    founded_year: int(v.founded_year),
+    founded_place: str(v.founded_place),
+  };
+}
+
 export function riddim(v: unknown): Riddim | null {
   if (!isObj(v)) return null;
   const r = ref(v);
@@ -93,8 +113,10 @@ export function riddim(v: unknown): Riddim | null {
         return vr ? [{ ...vr, year: isObj(x) ? int(x.year) : null }] : [];
       })
     : [];
+  const slug = str(v.slug);
   return {
     ...r,
+    slug: slug && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ? slug : '',
     year: int(v.year),
     summary: str(v.summary),
     alternate_names: Array.isArray(v.alternate_names)

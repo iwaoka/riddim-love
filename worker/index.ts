@@ -1,8 +1,14 @@
-// RIDDIM.LOVE Worker: serves the static app and a small, whitelisted
-// read-only relay to the Riddim-ID API v1 (https://api.riddim-id.com/docs).
+// RIDDIM.LOVE Worker: serves the static app, server-rendered detail pages,
+// a daily sitemap, and a small, whitelisted read-only relay to the Riddim-ID
+// API v1 (https://api.riddim-id.com/docs).
 
-import type { ApiError, SearchResult, TuneList } from '../shared/types';
+import { ORIGIN, PAGE_KINDS, pagePath, parsePagePath, type PageKind } from '../shared/seo';
+import type { ApiError, SearchResult } from '../shared/types';
+import { loadEntity, loadRiddim, loadTune, loadTunes } from './data';
+import { servePage } from './pages';
 import * as P from './project';
+import { serveSitemap } from './sitemap';
+import { data, UpstreamError, upstream } from './upstream';
 import {
   BadRequest,
   onlyParams,
@@ -19,95 +25,7 @@ export interface Env {
   ASSETS: Fetcher;
 }
 
-const UPSTREAM = 'https://api.riddim-id.com/v1';
-const USER_AGENT = 'RIDDIM.LOVE/0.1 (+https://riddim.love; independent non-commercial search frontend)';
-const UPSTREAM_TIMEOUT_MS = 10_000;
-const DEFAULT_TTL = 300;
 const SEARCH_LIMIT = 50; // upstream maximum
-
-/** Set when upstream answers 429; requests are refused locally until then. */
-let cooldownUntil = 0;
-
-class UpstreamError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message: string,
-    readonly retryAfter?: number,
-  ) {
-    super(message);
-  }
-}
-
-function ttlFrom(cacheControl: string | null): number {
-  const m = /s-maxage=(\d+)/.exec(cacheControl ?? '') ?? /max-age=(\d+)/.exec(cacheControl ?? '');
-  const n = m ? Number(m[1]) : DEFAULT_TTL;
-  return Math.min(Math.max(n, 60), 86_400);
-}
-
-/** GET an upstream path, through the Cloudflare edge cache. Returns parsed JSON. */
-async function upstream(path: string, params: Record<string, string | number | null>, ctx: ExecutionContext): Promise<unknown> {
-  const url = new URL(UPSTREAM + path);
-  for (const [k, v] of Object.entries(params).sort(([a], [b]) => a.localeCompare(b))) {
-    if (v !== null && v !== '') url.searchParams.set(k, String(v));
-  }
-  const cacheKey = new Request(url.toString(), { method: 'GET' });
-  const cache = caches.default;
-
-  const hit = await cache.match(cacheKey);
-  if (hit) return hit.json();
-
-  const now = Date.now();
-  if (now < cooldownUntil) {
-    const wait = Math.ceil((cooldownUntil - now) / 1000);
-    throw new UpstreamError(429, 'rate_limited', 'Riddim-ID is rate limiting requests. Please try again shortly.', wait);
-  }
-
-  let res: Response;
-  try {
-    res = await fetch(url.toString(), {
-      headers: { Accept: 'application/json', 'User-Agent': USER_AGENT },
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-    });
-  } catch {
-    throw new UpstreamError(502, 'upstream_unreachable', 'Could not reach Riddim-ID. Please try again.');
-  }
-
-  if (res.status === 429) {
-    const ra = Number(res.headers.get('Retry-After')) || 60;
-    cooldownUntil = Date.now() + ra * 1000;
-    throw new UpstreamError(429, 'rate_limited', 'Riddim-ID is rate limiting requests. Please try again shortly.', ra);
-  }
-  if (res.status === 404) throw new UpstreamError(404, 'not_found', 'Not found on Riddim-ID.');
-  if (res.status === 422) throw new UpstreamError(400, 'invalid_request', 'Riddim-ID rejected the request.');
-  if (!res.ok) throw new UpstreamError(502, 'upstream_error', `Riddim-ID returned an error (${res.status}).`);
-
-  const text = await res.text();
-  let body: unknown;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    throw new UpstreamError(502, 'upstream_error', 'Riddim-ID returned an unexpected response.');
-  }
-
-  const ttl = ttlFrom(res.headers.get('Cache-Control'));
-  const toCache = new Response(text, {
-    headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${ttl}` },
-  });
-  ctx.waitUntil(cache.put(cacheKey, toCache));
-  return body;
-}
-
-const data = (body: unknown): unknown => (body && typeof body === 'object' ? (body as { data?: unknown }).data : undefined);
-
-function tuneList(body: unknown): TuneList {
-  const meta = (body as { meta?: { total?: unknown; next_cursor?: unknown } })?.meta ?? {};
-  return {
-    tunes: P.tunes(data(body)),
-    total: typeof meta.total === 'number' ? meta.total : null,
-    next_cursor: typeof meta.next_cursor === 'string' ? meta.next_cursor : null,
-  };
-}
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -120,6 +38,7 @@ function json(body: unknown, status = 200, extra: Record<string, string> = {}): 
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
       'Cache-Control': status === 200 ? 'public, max-age=60' : 'no-store',
+      'X-Robots-Tag': 'noindex',
       ...SECURITY_HEADERS,
       ...extra,
     },
@@ -147,7 +66,7 @@ async function handleApi(url: URL, ctx: ExecutionContext): Promise<Response> {
       query: q,
       type,
       // Filter again by type, so nothing outside the selection can leak through.
-      names: type === 'tune' ? [] : hits.map(P.nameHit).filter((x) => x !== null && x.type === type) as SearchResult['names'],
+      names: type === 'tune' ? [] : (hits.map(P.nameHit).filter((x) => x !== null && x.type === type) as SearchResult['names']),
       tunes: type === 'tune' ? (hits.map(P.tuneHit).filter((x) => x !== null) as SearchResult['tunes']) : [],
       limit: SEARCH_LIMIT,
     };
@@ -156,70 +75,75 @@ async function handleApi(url: URL, ctx: ExecutionContext): Promise<Response> {
 
   if ((m = /^\/api\/riddims\/([^/]+)$/.exec(path))) {
     onlyParams(p, []);
-    const id = parseId(m[1]);
-    const r = P.riddim(data(await upstream(`/riddims/${id}`, {}, ctx)));
-    if (!r) throw new UpstreamError(502, 'upstream_error', 'Riddim-ID returned an unexpected response.');
-    return json(r);
+    return json(await loadRiddim(parseId(m[1]), ctx));
   }
 
   if ((m = /^\/api\/riddims\/([^/]+)\/tunes$/.exec(path))) {
     onlyParams(p, ['cursor', 'sort', 'q', 'versions']);
     const id = parseId(m[1]);
     const q = p.get('q') ? parseQuery(p.get('q'), { min: 1, max: 100 }) : null;
-    const body = await upstream(
-      `/riddims/${id}/tunes`,
-      {
-        cursor: parseCursor(p.get('cursor')),
-        sort: parseEnum(p.get('sort'), RIDDIM_TUNE_SORTS),
-        q,
-        versions: parseEnum(p.get('versions'), ['include'] as const),
-      },
-      ctx,
+    return json(
+      await loadTunes(
+        'riddim',
+        id,
+        {
+          cursor: parseCursor(p.get('cursor')),
+          sort: parseEnum(p.get('sort'), RIDDIM_TUNE_SORTS),
+          q,
+          versions: parseEnum(p.get('versions'), ['include'] as const),
+        },
+        ctx,
+      ),
     );
-    return json(tuneList(body));
   }
 
   if ((m = /^\/api\/(artists|producers|labels)\/([^/]+)\/tunes$/.exec(path))) {
     onlyParams(p, ['cursor', 'sort']);
-    const id = parseId(m[2]);
-    const body = await upstream(
-      `/${m[1]}/${id}/tunes`,
-      { cursor: parseCursor(p.get('cursor')), sort: parseEnum(p.get('sort'), TUNE_SORTS) },
-      ctx,
+    const kind = m[1].slice(0, -1) as 'artist' | 'producer' | 'label';
+    return json(
+      await loadTunes(kind, parseId(m[2]), { cursor: parseCursor(p.get('cursor')), sort: parseEnum(p.get('sort'), TUNE_SORTS) }, ctx),
     );
-    return json(tuneList(body));
+  }
+
+  if ((m = /^\/api\/(artists|producers|labels)\/([^/]+)$/.exec(path))) {
+    onlyParams(p, []);
+    return json(await loadEntity(m[1].slice(0, -1) as 'artist' | 'producer' | 'label', parseId(m[2]), ctx));
   }
 
   if ((m = /^\/api\/tunes\/([^/]+)$/.exec(path))) {
     onlyParams(p, []);
-    const id = parseId(m[1]);
-    const t = P.tune(data(await upstream(`/tunes/${id}`, {}, ctx)));
-    if (!t) throw new UpstreamError(502, 'upstream_error', 'Riddim-ID returned an unexpected response.');
-    return json(t);
+    return json(await loadTune(parseId(m[1]), ctx));
   }
 
   return errorResponse(404, 'not_found', 'Unknown API route.');
 }
 
-const CANONICAL_ORIGIN = 'https://riddim.love';
-
-/**
- * The HTML shell at "/" (the only document route; everything else under
- * /assets etc. is served by Static Assets without invoking the Worker).
- *
- * - workers.dev / plain http → 301 to the canonical https://riddim.love origin.
- * - Any query-string view (?q=, ?type=, ?riddim=, ?tune=, …) is app state, not a
- *   page of its own yet: send `X-Robots-Tag: noindex, follow` and drop the
- *   canonical tag (which points at "/"), so only the home page is indexed and
- *   links inside rendered views can still be followed.
- */
-async function serveShell(request: Request, env: Env, url: URL): Promise<Response> {
+/** workers.dev and plain-http visitors → the canonical https://riddim.love. */
+function canonicalRedirect(request: Request, url: URL): Response | null {
   const isWorkersDev = url.hostname.endsWith('.workers.dev');
   // The visitor's scheme comes from Cloudflare's CF-Visitor header (absent in
   // `wrangler dev`, which also rewrites the URL to the production hostname).
   const isHttp = /"scheme":"http"/.test(request.headers.get('CF-Visitor') ?? '');
-  if (isWorkersDev || isHttp) {
-    return Response.redirect(CANONICAL_ORIGIN + url.pathname + url.search, 301);
+  return isWorkersDev || isHttp ? Response.redirect(ORIGIN + url.pathname + url.search, 301) : null;
+}
+
+const LIST_PARAMS = ['f', 'sort', 'versions'];
+
+/**
+ * The HTML shell at "/": the home page and the search view (?type=&q=).
+ * - Old query-string detail URLs (?riddim=18, ?tune=759, …) → 301 to the
+ *   path URL (which then settles the slug).
+ * - Search views are app state: `X-Robots-Tag: noindex, follow`, no canonical.
+ */
+async function serveShell(env: Env, url: URL, request: Request): Promise<Response> {
+  for (const kind of PAGE_KINDS) {
+    const id = url.searchParams.get(kind);
+    if (id && /^[1-9]\d{0,8}$/.test(id)) {
+      const keep = new URLSearchParams();
+      if (kind !== 'tune') for (const k of LIST_PARAMS) if (url.searchParams.get(k)) keep.set(k, url.searchParams.get(k)!);
+      const qs = keep.toString();
+      return Response.redirect(ORIGIN + pagePath(kind as PageKind, Number(id)) + (qs ? `?${qs}` : ''), 301);
+    }
   }
   const res = await env.ASSETS.fetch(request);
   if (!url.search || res.status !== 200) return res;
@@ -238,14 +162,20 @@ async function serveShell(request: Request, env: Env, url: URL): Promise<Respons
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const isRead = request.method === 'GET' || request.method === 'HEAD';
+
     if (!url.pathname.startsWith('/api/')) {
-      if (url.pathname === '/' && (request.method === 'GET' || request.method === 'HEAD')) return serveShell(request, env, url);
+      if (!isRead) return env.ASSETS.fetch(request);
+      const redirect = canonicalRedirect(request, url);
+      if (redirect) return redirect;
+      if (url.pathname === '/') return serveShell(env, url, request);
+      if (url.pathname === '/sitemap.xml') return serveSitemap(ctx);
+      const page = parsePagePath(url.pathname);
+      if (page) return servePage(request, env, ctx, url, page);
       return env.ASSETS.fetch(request);
     }
 
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-      return errorResponse(405, 'method_not_allowed', 'Only GET is allowed.');
-    }
+    if (!isRead) return errorResponse(405, 'method_not_allowed', 'Only GET is allowed.');
     let res: Response;
     try {
       res = await handleApi(url, ctx);
@@ -260,3 +190,4 @@ export default {
     return request.method === 'HEAD' ? new Response(null, res) : res;
   },
 } satisfies ExportedHandler<Env>;
+

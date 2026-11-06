@@ -17,8 +17,15 @@ Data provided by [Riddim-ID](https://riddim-id.com/) via its public API v1. RIDD
 - Click a column header (Artist, Title, Riddim, Label, Year) to sort; click again to reverse. Client-side over the rows on screen (`Intl.Collator`, case-insensitive, blanks last, ties → Label → Artist → Title, stable). No extra requests: on paged lists only loaded rows are sorted, and the page says so. Tune search defaults to Artist → Title (search hits carry no label)
 - Full tune lists per riddim / artist / producer / label with "Load more" (cursor pagination)
 - Riddim filter (title or artist), sort, and "include versions"
-- Shareable URLs (`/?type=riddim&q=`, `/?riddim=18`, `/?artist=263`, `/?label=61`, `/?tune=759`)
+- Page URLs: `/riddim/18/sleng-teng`, `/artist/263/wayne-smith`, `/producer/595/king-jammy`, `/label/61/jammys`, `/tune/759/under-mi-sleng-teng`; search stays at `/?type=riddim&q=`. Old `/?riddim=18`-style links 301 to the page URL
 - Keyboard: `/` focuses search, `Enter` searches, `Esc` leaves the box
+
+## SEO
+
+- Detail pages are server-rendered by the Worker (`worker/pages.ts`): real `<title>`, description, canonical, H1, the first 100 tunes as HTML, and JSON-LD that mirrors the page (BreadcrumbList + CollectionPage/ItemList, MusicGroup, Organization/Person, MusicRecording). The page embeds the API data it used, so the app starts without refetching.
+- Indexed: home, riddim, artist, producer, label pages. `noindex, follow`: tune pages (thin), search views (`/?q=`). Filter/sort params keep the base canonical. Unknown ids → 404 (noindex); wrong/missing slug → 301.
+- `/sitemap.xml`: home + top 500 riddims, 200 labels, 200 artists by tune count — 9 upstream list requests, cached for a day. No catalogue crawling.
+- workers.dev and plain-http visitors → 301 to https://riddim.love.
 
 ## Stack
 

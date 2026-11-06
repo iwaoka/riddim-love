@@ -1,7 +1,12 @@
 import './style.css';
-import { artistNames, copyText, displayText, EXTERNAL_SEARCHES, externalSearchUrl, searchText, type ExternalSearch } from '../shared/format';
+import { copyText, displayText, EXTERNAL_SEARCHES, externalSearchUrl, searchText, type ExternalSearch } from '../shared/format';
+import { labelMeta, ORIGIN, parsePagePath, personMeta, refPath, riddimMeta, tuneMeta, tunePath, type PageMeta } from '../shared/seo';
 import { sortRows, type SortDir, type SortKey } from '../shared/sort';
-import type { ApiError, ListKind, NameHit, Ref, Riddim, RiddimRef, SearchResult, SearchType, Tune, TuneHit, TuneList } from '../shared/types';
+
+const HOME_TITLE = 'RIDDIM.LOVE — Riddim search for reggae & dancehall selectors';
+const HOME_DESCRIPTION =
+  'Search reggae and dancehall riddims, tunes, artists and labels. See every tune on a riddim with artist, label and year, then jump to YouTube or Discogs. Data provided by Riddim-ID.';
+import type { ApiError, ListKind, NameHit, Ref, Riddim, RiddimRef, SearchResult, SearchType, SsrData, Tune, TuneHit, TuneList } from '../shared/types';
 import { append, h, safeExternal } from './dom';
 
 // ---------- elements ----------
@@ -33,6 +38,18 @@ class ApiFailure extends Error {
 
 const memo = new Map<string, Promise<unknown>>();
 let navController: AbortController | null = null;
+
+// A server-rendered page embeds the /api responses it was built from, so the
+// first render here needs no request.
+try {
+  const el = document.getElementById('ssr-data');
+  if (el?.textContent) {
+    const ssr = JSON.parse(el.textContent) as SsrData;
+    for (const [path, value] of Object.entries(ssr.api ?? {})) memo.set(path, Promise.resolve(value));
+  }
+} catch {
+  /* ignore malformed data; the app fetches instead */
+}
 
 async function api<T>(path: string, signal?: AbortSignal): Promise<T> {
   const cached = memo.get(path);
@@ -67,8 +84,14 @@ type Route =
 const LIST_KINDS: ListKind[] = ['riddim', 'artist', 'producer', 'label'];
 const ID_RE = /^[1-9]\d{0,8}$/;
 
-function parseRoute(search: string): Route {
-  const p = new URLSearchParams(search);
+function parseRoute(loc: { pathname: string; search: string }): Route {
+  const p = new URLSearchParams(loc.search);
+  const page = parsePagePath(loc.pathname);
+  if (page) {
+    if (page.kind === 'tune') return { view: 'tune', id: page.id };
+    return { view: 'list', kind: page.kind, id: page.id, f: p.get('f') ?? '', sort: p.get('sort') ?? '', versions: p.get('versions') === '1' };
+  }
+  // Old query-string URLs (the Worker 301s these to path URLs; kept as a fallback).
   const tune = p.get('tune');
   if (tune && ID_RE.test(tune)) return { view: 'tune', id: Number(tune) };
   for (const kind of LIST_KINDS) {
@@ -159,7 +182,30 @@ function external(url: string | null, text: string, cls = ''): HTMLElement | nul
   return safe ? h('a', { href: safe, target: '_blank', rel: 'noopener noreferrer', class: cls || null }, text) : null;
 }
 
-const listHref = (kind: ListKind, id: number) => qs({ [kind]: id });
+/** Detail-page path for a riddim / artist / producer / label reference (slug from its riddim-id.com URL). */
+const listHref = (kind: ListKind, ref: Pick<Ref, 'id' | 'url'>) => refPath(kind, ref);
+
+/** A path with query params (empty values dropped). */
+function withQuery(path: string, params: Record<string, string | null | undefined | false>): string {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v) p.set(k, v);
+  const s = p.toString();
+  return s ? `${path}?${s}` : path;
+}
+
+/** Keeps <title>, description and canonical in step with in-app navigation. */
+function setHead(title: string, description: string | null, canonicalPath: string | null) {
+  document.title = title;
+  if (description) document.querySelector('meta[name="description"]')?.setAttribute('content', description);
+  let canon = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+  if (canonicalPath) {
+    if (!canon) {
+      canon = h('link', { rel: 'canonical' });
+      document.head.appendChild(canon);
+    }
+    canon.href = ORIGIN + canonicalPath;
+  } else canon?.remove();
+}
 
 // ---------- shared row rendering ----------
 type Row = { id: number; title: string; year: number | null; artists: Ref[]; riddim: RiddimRef | null; label?: Ref | null; is_original?: boolean };
@@ -265,7 +311,7 @@ function externalButton(id: ExternalSearch['id'], row: Pick<Row, 'artists' | 'ti
 }
 
 function infoButton(row: Row): HTMLAnchorElement {
-  const href = qs({ tune: row.id });
+  const href = tunePath(row);
   const label = `Details for ${displayText(row.artists, row.title)}`;
   return h('a', {
     href,
@@ -295,13 +341,13 @@ type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean };
 function tuneRow(row: Row, opts: TableOpts = {}): HTMLTableRowElement {
   const dash = () => h('span', { class: 'muted' }, '—');
   return h('tr', { class: row.is_original ? 'orig' : null },
-    h('td', { class: 'c-artist' }, row.artists.length ? artistNames(row.artists) : dash()),
+    h('td', { class: 'c-artist' }, ...(row.artists.length ? joinLinks(row.artists, 'artist') : [dash()])),
     h('td', { class: 'c-title' },
       row.title,
       row.is_original ? h('span', { class: 'badge', title: 'The original tune this riddim is named after' }, 'Original') : null,
     ),
-    opts.hideRiddim ? null : h('td', { class: 'c-riddim' }, row.riddim ? link(listHref('riddim', row.riddim.id), row.riddim.name) : dash()),
-    opts.hideLabel ? null : h('td', { class: 'c-label' }, row.label ? link(listHref('label', row.label.id), row.label.name) : dash()),
+    opts.hideRiddim ? null : h('td', { class: 'c-riddim' }, row.riddim ? link(listHref('riddim', row.riddim), row.riddim.name) : dash()),
+    opts.hideLabel ? null : h('td', { class: 'c-label' }, row.label ? link(listHref('label', row.label), row.label.name) : dash()),
     h('td', { class: 'c-year' }, row.year ? String(row.year) : ''),
     h('td', { class: 'c-act' }, h('span', { class: 'acts' }, ...rowActions(row))),
   );
@@ -404,7 +450,7 @@ function showError(err: unknown, retry: () => void) {
 // ---------- views ----------
 function renderHome() {
   document.body.classList.add('home');
-  document.title = 'RIDDIM.LOVE — Built for selectors';
+  setHead(HOME_TITLE, HOME_DESCRIPTION, '/');
   main.replaceChildren();
   input.value = '';
   // Autofocus only with a mouse/trackpad; on phones it would pop the keyboard.
@@ -438,7 +484,7 @@ function namesTable(type: Exclude<SearchType, 'tune'>, hits: NameHit[]): HTMLEle
       h('tbody', {},
         ...hits.map((n) =>
           h('tr', {},
-            h('td', { class: 'c-name' }, link(listHref(type, n.id), n.name)),
+            h('td', { class: 'c-name' }, link(listHref(type, n), n.name)),
             isRiddim ? h('td', { class: 'c-year' }, n.year ? String(n.year) : '') : null,
             isRiddim
               ? h('td', { class: 'c-note muted' },
@@ -455,7 +501,7 @@ function namesTable(type: Exclude<SearchType, 'tune'>, hits: NameHit[]): HTMLEle
 }
 
 async function renderSearch(q: string, type: SearchType, signal: AbortSignal) {
-  document.title = `${q} (${type}) — RIDDIM.LOVE`;
+  setHead(`${q} (${type}) — RIDDIM.LOVE`, null, null); // search views are not canonical pages
   input.value = q;
   if (q.length < 2) {
     main.replaceChildren(h('p', { class: 'state' }, 'Type at least 2 characters.'));
@@ -529,17 +575,24 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
 
   const ref = riddim ?? nameFromTunes(kind, id, list.tunes);
   const name = ref?.name ?? `${KIND_LABEL[kind]} #${id}`;
-  document.title = `${name} ${kind === 'riddim' && !/riddim/i.test(name) ? 'Riddim ' : ''}— RIDDIM.LOVE`;
+  // Same title / description / H1 rules as the server-rendered page.
+  const pm: PageMeta =
+    kind === 'riddim' && riddim
+      ? riddimMeta(riddim, list.total, list.tunes)
+      : kind === 'label'
+        ? labelMeta({ name, founded_year: null }, list.tunes)
+        : personMeta(kind === 'producer' ? 'producer' : 'artist', name, list.tunes);
+  setHead(pm.title, pm.description, ref ? listHref(kind, ref) : location.pathname);
   input.value = '';
 
   const head = h('header', { class: 'list-head' },
     h('p', { class: 'kind' }, KIND_LABEL[kind]),
-    h('h1', {}, name, riddim?.year ? h('span', { class: 'muted' }, ` ${riddim.year}`) : null),
+    h('h1', {}, pm.h1, riddim?.year ? h('span', { class: 'muted' }, ` ${riddim.year}`) : null),
   );
   if (riddim) {
     const facts: (Node | string)[] = [];
     if (riddim.producers.length) facts.push('Produced by ', ...joinLinks(riddim.producers, 'producer'));
-    if (riddim.version_of) facts.push(facts.length ? ' · ' : '', 'Version of ', link(listHref('riddim', riddim.version_of.id), riddim.version_of.name));
+    if (riddim.version_of) facts.push(facts.length ? ' · ' : '', 'Version of ', link(listHref('riddim', riddim.version_of), riddim.version_of.name));
     if (facts.length) head.appendChild(h('p', { class: 'facts' }, ...facts));
     if (riddim.alternate_names.length) head.appendChild(h('p', { class: 'facts muted' }, 'Also known as ' + riddim.alternate_names.join(', ')));
     if (riddim.versions.length) {
@@ -547,7 +600,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
         h('details', { class: 'versions' },
           h('summary', {}, `${riddim.versions.length} version${riddim.versions.length === 1 ? '' : 's'}`),
           h('ul', { class: 'chips' },
-            ...riddim.versions.map((v) => h('li', {}, link(listHref('riddim', v.id), v.name), v.year ? h('span', { class: 'muted' }, ` ${v.year}`) : null)),
+            ...riddim.versions.map((v) => h('li', {}, link(listHref('riddim', v), v.name), v.year ? h('span', { class: 'muted' }, ` ${v.year}`) : null)),
           ),
         ),
       );
@@ -572,7 +625,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
   }
   append(controls, [sortSel, kind === 'riddim' ? h('button', { type: 'submit' }, 'Apply') : null]);
   const apply = () =>
-    navigate(qs({ [kind]: id, f: filter?.value.trim() || null, sort: sortSel.value || null, versions: versions?.checked ? '1' : null }), true);
+    navigate(withQuery(location.pathname, { f: filter?.value.trim() || null, sort: sortSel.value || null, versions: versions?.checked ? '1' : null }), true);
   controls.addEventListener('submit', (e) => {
     e.preventDefault();
     apply();
@@ -635,9 +688,10 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
 
 function joinLinks(refs: Ref[], kind: ListKind): (Node | string)[] {
   const out: (Node | string)[] = [];
+  // Same " & " joining as artistNames() and the server-rendered page.
   refs.forEach((r, i) => {
-    if (i) out.push(i === refs.length - 1 ? ' & ' : ', ');
-    out.push(link(listHref(kind, r.id), r.name));
+    if (i) out.push(' & ');
+    out.push(link(listHref(kind, r), r.name));
   });
   return out;
 }
@@ -647,12 +701,13 @@ async function renderTune(id: number, signal: AbortSignal) {
   const t = await api<Tune>(`/api/tunes/${id}`, signal);
   if (signal.aborted) return;
   const text = displayText(t.artists, t.title);
-  document.title = `${text} — RIDDIM.LOVE`;
+  const tm = tuneMeta(t);
+  setHead(tm.title, tm.description, tunePath(t));
   const rows: [string, (Node | string)[]][] = [
     ['Artist', t.artists.length ? joinLinks(t.artists, 'artist') : ['—']],
     ['Title', [t.title, t.is_original ? h('span', { class: 'badge' }, 'Original') : '']],
-    ['Riddim', t.riddim ? [link(listHref('riddim', t.riddim.id), t.riddim.name), t.riddim.version_of ? h('span', { class: 'muted' }, ` (version of ${t.riddim.version_of})`) : ''] : ['—']],
-    ['Label', t.label ? [link(listHref('label', t.label.id), t.label.name)] : ['—']],
+    ['Riddim', t.riddim ? [link(listHref('riddim', t.riddim), t.riddim.name), t.riddim.version_of ? h('span', { class: 'muted' }, ` (version of ${t.riddim.version_of})`) : ''] : ['—']],
+    ['Label', t.label ? [link(listHref('label', t.label), t.label.name)] : ['—']],
     ['Producer', t.producers.length ? joinLinks(t.producers, 'producer') : ['—']],
     ['Year', [t.year ? String(t.year) : '—']],
   ];
@@ -675,7 +730,7 @@ async function render() {
   navController?.abort();
   const ctrl = new AbortController();
   navController = ctrl;
-  const route = parseRoute(location.search);
+  const route = parseRoute(location);
   document.body.classList.toggle('home', route.view === 'home');
   if (route.view === 'home' || route.view === 'search') {
     showType(route.type);
@@ -721,7 +776,7 @@ for (const r of typeRadios) {
     showType(type);
     const q = input.value.replace(/\s+/g, ' ').trim();
     if (q.length >= 2) navigate(qs({ type, q }), true);
-    else if (parseRoute(location.search).view === 'home') history.replaceState(null, '', qs({ type }));
+    else if (parseRoute(location).view === 'home') history.replaceState(null, '', qs({ type }));
     input.focus();
   });
 }
