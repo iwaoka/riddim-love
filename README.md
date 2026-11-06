@@ -62,4 +62,5 @@ npm test          # unit tests (vitest)
 npm run build     # typecheck + vite build to dist/
 npx wrangler dev  # Worker + assets on http://localhost:8787
 npm run deploy    # build + wrangler deploy
+npm run deploy:www  # www.riddim.love → https://riddim.love (301; redirect-only Worker in www-redirect/)
 ```

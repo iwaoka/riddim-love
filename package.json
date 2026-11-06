@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json --noEmit && tsc -p worker/tsconfig.json --noEmit && vite build",
     "preview": "npm run build && wrangler dev",
     "test": "vitest run",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:www": "wrangler deploy -c www-redirect/wrangler.jsonc"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261106.1",
