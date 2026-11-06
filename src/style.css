@@ -374,19 +374,20 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 }
 
 /* ---------- action button colours (last, so they win over layout rules) ----------
-   YouTube red · Discogs black · Info blue · Copy grey; white icon/text on each. */
+   YouTube red · Discogs black · Info blue · Copy grey — muted tones so the rows stay calm;
+   white icon/text on each (≥ 3:1 for icons, YouTube label ≥ 4.5:1). */
 :root {
-  --btn-yt: #cc1f1a;      --btn-yt-hover: #a91913;
-  --btn-discogs: #16181a; --btn-discogs-hover: #000000; --btn-discogs-edge: #16181a;
-  --btn-info: #1a6ed8;    --btn-info-hover: #1559b0;
-  --btn-copy: #6b7280;    --btn-copy-hover: #545a64;
+  --btn-yt: #b5524c;      --btn-yt-hover: #a3453f;
+  --btn-discogs: #3b4046; --btn-discogs-hover: #2e3237; --btn-discogs-edge: #3b4046;
+  --btn-info: #4f7bb3;    --btn-info-hover: #436ca1;
+  --btn-copy: #8a9099;    --btn-copy-hover: #777e87;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --btn-yt: #c42b1c;      --btn-yt-hover: #dc3b2b;
-    --btn-discogs: #000000; --btn-discogs-hover: #000000; --btn-discogs-edge: #4a5058; /* edge keeps black visible on dark */
-    --btn-info: #2a6fd0;    --btn-info-hover: #3b82e6;
-    --btn-copy: #5b626b;    --btn-copy-hover: #6c747e;
+    --btn-yt: #9c4842;      --btn-yt-hover: #ad5149;
+    --btn-discogs: #2b2f34; --btn-discogs-hover: #33383e; --btn-discogs-edge: #454b52; /* edge keeps it visible on dark */
+    --btn-info: #40679b;    --btn-info-hover: #4a74ab;
+    --btn-copy: #5d646c;    --btn-copy-hover: #69717a;
   }
 }
 .act.act-yt      { --c: var(--btn-yt);      --c-h: var(--btn-yt-hover);      --e: var(--btn-yt); }
@@ -401,5 +402,5 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 }
 .act.act-discogs:hover { border-color: var(--e); }
 /* copy feedback */
-.act.act-copy.done { background: #0a7a3a; border-color: #0a7a3a; color: #fff; }
-.act.act-copy.fail { background: #b3261e; border-color: #b3261e; color: #fff; }
+.act.act-copy.done { background: #3f8a5c; border-color: #3f8a5c; color: #fff; }
+.act.act-copy.fail { background: #a3453f; border-color: #a3453f; color: #fff; }
