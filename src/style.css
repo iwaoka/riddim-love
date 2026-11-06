@@ -21,6 +21,8 @@
   --ok: #0a7a3a;
   --err: #b3261e;
   --shadow: 0 1px 2px rgb(16 24 32 / 0.04), 0 1px 1px rgb(16 24 32 / 0.03);
+  --yt: #cc1f1a;
+  --yt-hover: #a91913;
   --radius: 8px;
   --radius-sm: 6px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
@@ -47,6 +49,8 @@
     --ok: #3ccf74;
     --err: #ff8a80;
     --shadow: none;
+    --yt: #c42b1c;
+    --yt-hover: #dc3b2b;
   }
 }
 
@@ -221,34 +225,44 @@ p.state[role="status"] { flex-direction: row; align-items: center; gap: 8px; }
 .tunes tbody tr:hover, .names-table tbody tr:hover { background: var(--row-hover); }
 
 .tunes td { padding: 5px 10px; }
-.tunes .c-copy { width: 46px; padding: 3px 0 3px 6px; }
+.tunes th:first-child, .tunes td:first-child { padding-left: 14px; }
 .tunes .c-artist { font-weight: 600; width: 24%; }
 .tunes .c-title { width: 30%; }
 .tunes .c-riddim, .tunes .c-label { color: var(--fg-2); }
 .tunes .c-year { width: 4em; text-align: right; font-variant-numeric: tabular-nums; color: var(--fg-3); }
-.tunes td.c-act, .tunes th.c-act { display: table-cell; width: 1%; white-space: nowrap; text-align: right; padding-right: 10px; }
-.tunes td.c-act .act + .act { margin-left: 4px; }
+.tunes td.c-act, .tunes th.c-act { display: table-cell; width: 1%; white-space: nowrap; text-align: right; padding-right: 8px; }
 .c-year { font-variant-numeric: tabular-nums; color: var(--fg-3); }
 /* the original tune gets a faint accent edge */
 .tunes tbody tr.orig td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 
-/* copy icon button: first column, primary action */
-button.copy {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 36px; height: 36px; padding: 0;
-  border: 1px solid transparent; border-radius: var(--radius-sm);
-  background: transparent; color: var(--fg-2);
-}
-button.copy:hover { color: var(--fg); background: var(--surface); border-color: var(--line-strong); }
-button.copy.done { color: var(--ok); border-color: var(--ok); background: var(--accent-soft); }
-button.copy.fail { color: var(--err); border-color: var(--err); }
-button.copy.act-copy { width: 44px; height: 44px; border-color: var(--line-strong); background: var(--surface-2); }
 .c-riddim a, .c-label a { text-decoration: none; }
 .c-riddim a:hover, .c-label a:hover { text-decoration: underline; color: var(--accent); }
 .badge { display: inline-block; margin-left: 6px; font-size: 10.5px; font-weight: 700; padding: 0 7px; border-radius: 99px; color: var(--accent); background: var(--accent-soft); vertical-align: 1px; letter-spacing: 0.02em; }
-.c-act { display: flex; gap: 4px; justify-content: flex-end; white-space: nowrap; }
-.act { font-size: 13px; padding: 4px 10px; line-height: 1.3; text-decoration: none; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); display: inline-block; color: var(--fg); }
-.act:hover, a.act:hover { color: var(--fg); border-color: var(--fg-3); background: var(--surface-2); }
+/* ---------- row actions: YouTube → Discogs → Info → Copy ---------- */
+.acts { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; white-space: nowrap; vertical-align: middle; }
+.act {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  height: 30px; min-width: 30px; padding: 0 9px;
+  font: inherit; font-size: 13px; font-weight: 600; line-height: 1; text-decoration: none;
+  color: var(--fg-2); background: transparent;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.act:hover, a.act:hover { color: var(--fg); background: var(--surface); border-color: var(--line-strong); }
+.act:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.act svg { flex: none; }
+.act-icon { width: 30px; padding: 0; }
+/* Discogs shows its name when there is room */
+.act-ext.act-icon { width: auto; padding: 0 7px; }
+.act-text-wide { display: none; }
+@media (min-width: 1100px) { .act-text-wide { display: inline; } }
+/* YouTube: the primary action — solid, recognisable */
+.act-yt { color: #fff; background: var(--yt); border-color: var(--yt); padding: 0 10px 0 8px; }
+.act-yt:hover, a.act-yt:hover { color: #fff; background: var(--yt-hover); border-color: var(--yt-hover); }
+.act-yt svg { fill: currentColor; }
+/* copy feedback */
+.act.copy.done { color: var(--ok); border-color: var(--ok); background: var(--accent-soft); }
+.act.copy.fail { color: var(--err); border-color: var(--err); }
 
 /* names table (riddim / artist / label search) */
 .names-table td { padding: 0; }
@@ -282,14 +296,21 @@ button.copy.act-copy { width: 44px; height: 44px; border-color: var(--line-stron
 .tune dl { display: grid; grid-template-columns: max-content 1fr; margin: 16px 0; border-top: 1px solid var(--line); }
 .tune dt, .tune dd { padding: 9px 0; border-bottom: 1px solid var(--line); margin: 0; }
 .tune dt { color: var(--fg-2); padding-right: 24px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; align-self: stretch; display: flex; align-items: center; }
-.tune .c-act { justify-content: flex-start; align-items: center; margin: 0 0 12px; }
-.tune .act { font-size: 14px; padding: 8px 14px; }
+.acts-lg { display: flex; justify-content: flex-start; gap: 6px; margin: 0 0 12px; }
+.acts-lg .act { height: 38px; min-width: 38px; font-size: 14px; border-color: var(--line-strong); background: var(--surface-2); }
+.acts-lg .act-icon { width: 38px; }
+.acts-lg .act-ext.act-icon { width: auto; padding: 0 12px; }
+.acts-lg .act-text-wide { display: inline; }
+.acts-lg .act-yt { background: var(--yt); border-color: var(--yt); padding: 0 14px 0 11px; }
 .tune > p.muted:last-child { margin: 0; padding-top: 12px; border-top: 1px dashed var(--line); font-size: 13px; }
 
 /* ---------- footer ---------- */
-.foot { border-top: 1px solid var(--line-strong); background: var(--surface); padding: 16px 16px 22px; font-size: 13px; color: var(--fg-2); text-align: center; }
-.foot p { margin: 2px 0; }
-.foot .tag { font-weight: 600; color: var(--fg); }
+.foot { border-top: 1px solid var(--line); padding: 12px 16px 16px; font-size: 12.5px; color: var(--fg-2); text-align: center; }
+.foot p { margin: 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 2px 8px; }
+.foot-brand { font-weight: 800; letter-spacing: 0.04em; color: var(--fg); }
+.foot-sep { color: var(--fg-3); }
+.foot a { color: var(--fg); }
+.foot a:hover { color: var(--accent); }
 body.home .foot { background: transparent; border-top-color: var(--line); }
 
 /* ---------- small screens ---------- */
@@ -310,35 +331,38 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
   .tunes thead { display: block; background: var(--head); border-bottom: 1px solid var(--line-strong); }
   .tunes thead tr { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
   .tunes thead th { display: block; padding: 0; border: 0; width: auto !important; background: transparent !important; }
-  .tunes thead th.c-copy, .tunes thead th.c-act { position: absolute; width: 1px !important; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .tunes thead th.c-act { position: absolute; width: 1px !important; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .tunes thead .sort-btn { border: 1px solid var(--line-strong); border-radius: 99px; padding: 6px 12px; min-height: 34px; background: var(--surface); }
   .tunes thead th[aria-sort="ascending"] .sort-btn, .tunes thead th[aria-sort="descending"] .sort-btn { border-color: var(--accent); color: var(--fg); background: var(--accent-soft); }
 
-  /* table → stacked rows: [copy] Artist / Title / riddim · label · year  [buttons] */
+  /* table → stacked rows: Artist / Title / riddim · label · year  [YouTube Discogs Info Copy] */
   .tunes, .tunes tbody { display: block; }
   .tunes tbody tr {
     display: grid;
-    grid-template-columns: 44px auto auto minmax(0, 1fr) auto;
-    grid-template-areas: "copy artist artist artist artist" "copy title title title title" "copy riddim label year act";
-    align-items: center; column-gap: 10px; row-gap: 2px;
-    padding: 9px 10px; border-bottom: 1px solid var(--line);
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    /* buttons sit to the right of title + meta (rows 2–3) so they add no height */
+    grid-template-areas: "artist artist artist artist" "title title title act" "riddim label year act";
+    align-items: center; column-gap: 8px; row-gap: 1px;
+    padding: 8px 10px 8px 12px; border-bottom: 1px solid var(--line);
   }
   .tunes tbody tr:last-child { border-bottom: 0; }
-  .tunes td { display: block; padding: 0; border: 0 !important; width: auto !important; text-align: left !important; }
-  .tunes .c-copy { grid-area: copy; align-self: center; }
+  .tunes td, .tunes td:first-child { display: block; padding: 0; border: 0 !important; width: auto !important; text-align: left !important; }
   .tunes .c-artist { grid-area: artist; }
   .tunes .c-title { grid-area: title; }
   .tunes .c-riddim { grid-area: riddim; }
   .tunes .c-label { grid-area: label; }
   .tunes .c-year { grid-area: year; }
-  .tunes td.c-act { grid-area: act; justify-self: end; display: block; padding: 0; }
+  .tunes td.c-act { grid-area: act; justify-self: end; align-self: center; display: block; padding: 0; }
   .tunes .c-riddim, .tunes .c-label, .tunes .c-year { font-size: 13px; color: var(--fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tunes td.c-riddim + td.c-label::before, .tunes td.c-label + td.c-year:not(:empty)::before, .tunes td.c-riddim + td.c-year:not(:empty)::before { content: "· "; }
   .tunes td.c-year:empty { display: none; }
   .tunes tbody tr.orig td:first-child { box-shadow: none; }
   .tunes tbody tr.orig { box-shadow: inset 3px 0 0 var(--accent); }
-  button.copy { width: 44px; height: 44px; border-color: var(--line-strong); background: var(--surface); }
-  .act { padding: 6px 10px; }
+  /* touch: 40px targets, icons only; YouTube stays solid red */
+  .tunes .acts { gap: 3px; }
+  .tunes .act { height: 40px; min-width: 40px; width: 40px; padding: 0; border-color: var(--line); background: var(--surface); }
+  .tunes .act-yt { background: var(--yt); border-color: var(--yt); color: #fff; }
+  .tunes .act-text { display: none; }
 
   .names-table .c-note { width: 38%; }
   .tune { padding: 14px; }

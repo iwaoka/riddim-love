@@ -32,7 +32,7 @@ export function safeExternal(url: string | null): string | null {
   if (!url) return null;
   try {
     const u = new URL(url);
-    return u.protocol === 'https:' && (u.hostname === 'riddim-id.com' || u.hostname === 'www.youtube.com') ? u.toString() : null;
+    return u.protocol === 'https:' && ['riddim-id.com', 'www.youtube.com', 'www.discogs.com'].includes(u.hostname) ? u.toString() : null;
   } catch {
     return null;
   }

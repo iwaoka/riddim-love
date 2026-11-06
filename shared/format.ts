@@ -10,9 +10,31 @@ export function copyText(artists: Ref[], title: string): string {
   return [artistNames(artists), title].filter(Boolean).join(' - ').replace(/\s+/g, ' ').trim();
 }
 
-/** Plain "Artist Title" search words (used for YouTube). */
+/** Plain "Artist Title" search words, shared by every external search. */
 export function searchText(artists: Ref[], title: string): string {
   return [artistNames(artists), title].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * External search services. Each one only builds a search-results URL from the
+ * shared "Artist Title" words: no API calls, no links to specific releases.
+ * Add a service here and it appears wherever tunes are listed.
+ */
+export interface ExternalSearch {
+  id: 'youtube' | 'discogs';
+  name: string;
+  url(query: string): string;
+}
+
+export const EXTERNAL_SEARCHES: readonly ExternalSearch[] = [
+  { id: 'youtube', name: 'YouTube', url: (q) => 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q) },
+  { id: 'discogs', name: 'Discogs', url: (q) => 'https://www.discogs.com/search/?q=' + encodeURIComponent(q) },
+];
+
+export function externalSearchUrl(id: ExternalSearch['id'], artists: Ref[], title: string): string {
+  const service = EXTERNAL_SEARCHES.find((s) => s.id === id);
+  if (!service) throw new Error(`Unknown external search: ${id}`);
+  return service.url(searchText(artists, title));
 }
 
 /** Display format: "Artist – Title". */
@@ -23,5 +45,5 @@ export function displayText(artists: Ref[], title: string): string {
 
 /** YouTube search results URL for the given words (e.g. "Artist Title"). */
 export function youtubeUrl(query: string): string {
-  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query);
+  return EXTERNAL_SEARCHES[0].url(query);
 }

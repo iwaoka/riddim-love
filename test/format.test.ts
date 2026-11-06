@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { copyText, displayText, searchText, youtubeUrl } from '../shared/format';
+import { copyText, displayText, EXTERNAL_SEARCHES, externalSearchUrl, searchText, youtubeUrl } from '../shared/format';
 
 const ws = [{ id: 263, name: 'Wayne Smith', url: null }];
 
@@ -21,5 +21,17 @@ describe('format', () => {
   });
   it('youtube url is encoded', () => {
     expect(youtubeUrl('A & B #1 / ?x')).toBe('https://www.youtube.com/results?search_query=A%20%26%20B%20%231%20%2F%20%3Fx');
+  });
+  it('external searches share "Artist Title"; copy stays "Artist - Title"', () => {
+    expect(externalSearchUrl('youtube', ws, 'Under Mi Sleng Teng')).toBe('https://www.youtube.com/results?search_query=Wayne%20Smith%20Under%20Mi%20Sleng%20Teng');
+    expect(externalSearchUrl('discogs', ws, 'Under Mi Sleng Teng')).toBe('https://www.discogs.com/search/?q=Wayne%20Smith%20Under%20Mi%20Sleng%20Teng');
+    expect(copyText(ws, 'Under Mi Sleng Teng')).toBe('Wayne Smith - Under Mi Sleng Teng');
+  });
+  it('discogs url is encoded', () => {
+    const a = [{ id: 1, name: 'Bounty Killer & Wayne Smith', url: null }];
+    expect(externalSearchUrl('discogs', a, 'Sleng Teng #1 / Ting?')).toBe('https://www.discogs.com/search/?q=Bounty%20Killer%20%26%20Wayne%20Smith%20Sleng%20Teng%20%231%20%2F%20Ting%3F');
+  });
+  it('services are listed in button order', () => {
+    expect(EXTERNAL_SEARCHES.map((s) => s.id)).toEqual(['youtube', 'discogs']);
   });
 });

@@ -1,5 +1,5 @@
 import './style.css';
-import { artistNames, copyText, displayText, searchText, youtubeUrl } from '../shared/format';
+import { artistNames, copyText, displayText, EXTERNAL_SEARCHES, externalSearchUrl, searchText, type ExternalSearch } from '../shared/format';
 import { sortRows, type SortDir, type SortKey } from '../shared/sort';
 import type { ApiError, ListKind, NameHit, Ref, Riddim, RiddimRef, SearchResult, SearchType, Tune, TuneHit, TuneList } from '../shared/types';
 import { append, h, safeExternal } from './dom';
@@ -189,16 +189,28 @@ const ICONS = {
   copy: ['M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2', 'rect:8,8,14,14,2'],
   check: ['M20 6 9 17l-5-5'],
   x: ['M18 6 6 18', 'm6 6 12 12'],
+  play: ['poly:6 3 20 12 6 21 6 3'],
+  disc: ['circle:12,12,10', 'circle:12,12,2'],
+  info: ['circle:12,12,10', 'M12 16v-4', 'M12 8h.01'],
 } as const;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-function icon(name: keyof typeof ICONS): SVGSVGElement {
+function icon(name: keyof typeof ICONS, size = 18): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
-  for (const [k, v] of Object.entries({ viewBox: '0 0 24 24', width: '18', height: '18', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' })) {
+  for (const [k, v] of Object.entries({ viewBox: '0 0 24 24', width: String(size), height: String(size), fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' })) {
     svg.setAttribute(k, v);
   }
   for (const d of ICONS[name]) {
-    if (d.startsWith('rect:')) {
+    if (d.startsWith('poly:')) {
+      const poly = document.createElementNS(SVG_NS, 'polygon');
+      poly.setAttribute('points', d.slice(5));
+      svg.appendChild(poly);
+    } else if (d.startsWith('circle:')) {
+      const [cx, cy, r] = d.slice(7).split(',');
+      const c = document.createElementNS(SVG_NS, 'circle');
+      for (const [k, v] of Object.entries({ cx, cy, r })) c.setAttribute(k, v);
+      svg.appendChild(c);
+    } else if (d.startsWith('rect:')) {
       const [x, y, w, hh, r] = d.slice(5).split(',');
       const rect = document.createElementNS(SVG_NS, 'rect');
       for (const [k, v] of Object.entries({ x, y, width: w, height: hh, rx: r, ry: r })) rect.setAttribute(k, v);
@@ -212,41 +224,77 @@ function icon(name: keyof typeof ICONS): SVGSVGElement {
   return svg;
 }
 
-function copyButton(text: string, cls = ''): HTMLButtonElement {
+/** Copy "Artist - Title" (local only, no request); brief check-mark feedback. */
+function copyButton(text: string): HTMLButtonElement {
   const label = `Copy “${text}”`;
-  const btn = h('button', { type: 'button', class: ('copy ' + cls).trim(), title: label, 'aria-label': label }, icon('copy'));
+  const btn = h('button', { type: 'button', class: 'act act-icon copy', title: label, 'aria-label': label }, icon('copy', 16));
   let timer = 0;
   btn.addEventListener('click', async () => {
     const ok = await copyToClipboard(text);
-    btn.replaceChildren(icon(ok ? 'check' : 'x'));
+    btn.replaceChildren(icon(ok ? 'check' : 'x', 16));
     btn.classList.toggle('done', ok);
     btn.classList.toggle('fail', !ok);
     announce(ok ? `Copied: ${text}` : 'Copy failed');
     clearTimeout(timer);
     timer = window.setTimeout(() => {
-      btn.replaceChildren(icon('copy'));
+      btn.replaceChildren(icon('copy', 16));
       btn.classList.remove('done', 'fail');
     }, 1200);
   });
   return btn;
 }
 
-function youtubeButton(row: Row): HTMLButtonElement {
+/** Link to an external search-results page (new tab), built from "Artist Title". */
+function externalButton(id: ExternalSearch['id'], row: Pick<Row, 'artists' | 'title'>): HTMLAnchorElement {
+  const service = EXTERNAL_SEARCHES.find((s) => s.id === id)!;
   const query = searchText(row.artists, row.title);
-  const btn = h('button', { type: 'button', class: 'act yt', 'aria-label': `Search YouTube for ${query}`, title: `YouTube: ${query}` }, 'YouTube');
-  btn.addEventListener('click', () => {
-    window.open(youtubeUrl(query), '_blank', 'noopener,noreferrer');
-  });
-  return btn;
+  const label = `Search ${service.name} for “${query}” (opens in a new tab)`;
+  const isYt = id === 'youtube';
+  return h('a', {
+    href: externalSearchUrl(id, row.artists, row.title),
+    target: '_blank',
+    rel: 'noopener noreferrer',
+    class: isYt ? 'act act-yt' : 'act act-icon act-ext',
+    title: label,
+    'aria-label': label,
+  },
+    icon(isYt ? 'play' : 'disc', isYt ? 13 : 16),
+    // YouTube keeps its name visible; Discogs shows its name only where there is room.
+    h('span', { class: isYt ? 'act-text' : 'act-text act-text-wide' }, service.name),
+  );
+}
+
+function infoButton(row: Row): HTMLAnchorElement {
+  const href = qs({ tune: row.id });
+  const label = `Details for ${displayText(row.artists, row.title)}`;
+  return h('a', {
+    href,
+    class: 'act act-icon',
+    title: label,
+    'aria-label': label,
+    onclick: ((e: MouseEvent) => {
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      navigate(href);
+    }) as EventListener,
+  }, icon('info', 16));
+}
+
+/** Row actions, in priority order: YouTube → Discogs → Info → Copy. */
+function rowActions(row: Row, { info = true } = {}): (HTMLElement | null)[] {
+  return [
+    externalButton('youtube', row),
+    externalButton('discogs', row),
+    info ? infoButton(row) : null,
+    copyButton(copyText(row.artists, row.title)),
+  ];
 }
 
 type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean };
 
 function tuneRow(row: Row, opts: TableOpts = {}): HTMLTableRowElement {
-  const text = displayText(row.artists, row.title);
   const dash = () => h('span', { class: 'muted' }, '—');
   return h('tr', { class: row.is_original ? 'orig' : null },
-    h('td', { class: 'c-copy' }, copyButton(copyText(row.artists, row.title))),
     h('td', { class: 'c-artist' }, row.artists.length ? artistNames(row.artists) : dash()),
     h('td', { class: 'c-title' },
       row.title,
@@ -255,15 +303,7 @@ function tuneRow(row: Row, opts: TableOpts = {}): HTMLTableRowElement {
     opts.hideRiddim ? null : h('td', { class: 'c-riddim' }, row.riddim ? link(listHref('riddim', row.riddim.id), row.riddim.name) : dash()),
     opts.hideLabel ? null : h('td', { class: 'c-label' }, row.label ? link(listHref('label', row.label.id), row.label.name) : dash()),
     h('td', { class: 'c-year' }, row.year ? String(row.year) : ''),
-    h('td', { class: 'c-act' },
-      youtubeButton(row),
-      h('a', { href: qs({ tune: row.id }), class: 'act info', 'aria-label': `Details for ${text}`, title: 'Details',
-        onclick: ((e: MouseEvent) => {
-          if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
-          e.preventDefault();
-          navigate(qs({ tune: row.id }));
-        }) as EventListener }, 'Info'),
-    ),
+    h('td', { class: 'c-act' }, h('span', { class: 'acts' }, ...rowActions(row))),
   );
 }
 
@@ -322,7 +362,6 @@ function tuneTable(
     h('table', { class: 'tunes' },
       h('thead', {},
         h('tr', {},
-          plainHead('c-copy', 'Copy'),
           sortHead('artist'),
           sortHead('title'),
           opts.hideRiddim ? null : sortHead('riddim'),
@@ -622,7 +661,7 @@ async function renderTune(id: number, signal: AbortSignal) {
       h('p', { class: 'kind' }, 'Tune'),
       h('h1', { class: 'at' }, text),
       h('dl', {}, ...rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, ...v)])),
-      h('p', { class: 'c-act' }, copyButton(copyText(t.artists, t.title), 'act-copy'), youtubeButton(t)),
+      h('p', { class: 'acts acts-lg' }, ...rowActions(t, { info: false })),
       h('p', { class: 'muted' },
         'Source: ',
         external(t.riddim?.url ?? null, `${t.riddim?.name ?? 'Riddim'} on Riddim-ID ↗`) ?? external('https://riddim-id.com/', 'Riddim-ID ↗'),
