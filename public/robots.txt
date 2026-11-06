@@ -1,2 +1,6 @@
 User-agent: *
 Allow: /
+# JSON relay for the app; not pages. Keeps crawlers off the upstream API.
+Disallow: /api/
+
+Sitemap: https://riddim.love/sitemap.xml

@@ -201,10 +201,47 @@ async function handleApi(url: URL, ctx: ExecutionContext): Promise<Response> {
   return errorResponse(404, 'not_found', 'Unknown API route.');
 }
 
+const CANONICAL_ORIGIN = 'https://riddim.love';
+
+/**
+ * The HTML shell at "/" (the only document route; everything else under
+ * /assets etc. is served by Static Assets without invoking the Worker).
+ *
+ * - workers.dev / plain http → 301 to the canonical https://riddim.love origin.
+ * - Any query-string view (?q=, ?type=, ?riddim=, ?tune=, …) is app state, not a
+ *   page of its own yet: send `X-Robots-Tag: noindex, follow` and drop the
+ *   canonical tag (which points at "/"), so only the home page is indexed and
+ *   links inside rendered views can still be followed.
+ */
+async function serveShell(request: Request, env: Env, url: URL): Promise<Response> {
+  const isWorkersDev = url.hostname.endsWith('.workers.dev');
+  // The visitor's scheme comes from Cloudflare's CF-Visitor header (absent in
+  // `wrangler dev`, which also rewrites the URL to the production hostname).
+  const isHttp = /"scheme":"http"/.test(request.headers.get('CF-Visitor') ?? '');
+  if (isWorkersDev || isHttp) {
+    return Response.redirect(CANONICAL_ORIGIN + url.pathname + url.search, 301);
+  }
+  const res = await env.ASSETS.fetch(request);
+  if (!url.search || res.status !== 200) return res;
+
+  const out = new Response(res.body, res);
+  out.headers.set('X-Robots-Tag', 'noindex, follow');
+  return new HTMLRewriter()
+    .on('link[rel="canonical"]', {
+      element(el) {
+        el.remove();
+      },
+    })
+    .transform(out);
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+    if (!url.pathname.startsWith('/api/')) {
+      if (url.pathname === '/' && (request.method === 'GET' || request.method === 'HEAD')) return serveShell(request, env, url);
+      return env.ASSETS.fetch(request);
+    }
 
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       return errorResponse(405, 'method_not_allowed', 'Only GET is allowed.');
