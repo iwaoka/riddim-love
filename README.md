@@ -19,7 +19,6 @@ Data provided by [Riddim-ID](https://riddim-id.com/) via its public API v1. RIDD
 - Click a column header (Artist, Title, Riddim, Label, Year) to sort; click again to reverse (`Intl.Collator`, case-insensitive, blanks last, ties → Label → Artist → Title, stable). On riddim / artist / producer / label lists the sort covers the **whole list**: loaded rows re-sort at once, then the remaining pages load in the background (cap 1,500; 99.6% of riddims fit in one page, so usually no extra request). Tune search defaults to Artist → Title (search hits carry no label)
 - List filter: live, as you type, over Artist / Title / Label (case-, accent- and apostrophe-insensitive; every word must match; `shared/filter.ts`). Kept in the URL as `?f=`; also triggers loading the whole list
 - Full tune lists per riddim / artist / producer / label with "Load more" (cursor pagination)
-- Riddim lists: "include versions"
 - Page URLs: `/riddim/18/sleng-teng`, `/artist/263/wayne-smith`, `/producer/595/king-jammy`, `/label/61/jammys`, `/tune/759/under-mi-sleng-teng`; search stays at `/?type=riddim&q=`. Old `/?riddim=18`-style links 301 to the page URL
 - Keyboard: `/` focuses search, `Enter` searches, `Esc` leaves the box
 

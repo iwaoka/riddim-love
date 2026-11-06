@@ -80,7 +80,7 @@ async function api<T>(path: string, signal?: AbortSignal): Promise<T> {
 type Route =
   | { view: 'home'; type: SearchType }
   | { view: 'search'; q: string; type: SearchType }
-  | { view: 'list'; kind: ListKind; id: number; f: string; sort: string; versions: boolean }
+  | { view: 'list'; kind: ListKind; id: number; f: string }
   | { view: 'tune'; id: number };
 
 const LIST_KINDS: ListKind[] = ['riddim', 'artist', 'producer', 'label'];
@@ -91,7 +91,7 @@ function parseRoute(loc: { pathname: string; search: string }): Route {
   const page = parsePagePath(loc.pathname);
   if (page) {
     if (page.kind === 'tune') return { view: 'tune', id: page.id };
-    return { view: 'list', kind: page.kind, id: page.id, f: p.get('f') ?? '', sort: p.get('sort') ?? '', versions: p.get('versions') === '1' };
+    return { view: 'list', kind: page.kind, id: page.id, f: p.get('f') ?? '' };
   }
   // Old query-string URLs (the Worker 301s these to path URLs; kept as a fallback).
   const tune = p.get('tune');
@@ -99,7 +99,7 @@ function parseRoute(loc: { pathname: string; search: string }): Route {
   for (const kind of LIST_KINDS) {
     const id = p.get(kind);
     if (id && ID_RE.test(id)) {
-      return { view: 'list', kind, id: Number(id), f: p.get('f') ?? '', sort: p.get('sort') ?? '', versions: p.get('versions') === '1' };
+      return { view: 'list', kind, id: Number(id), f: p.get('f') ?? '' };
     }
   }
   const raw = p.get('type');
@@ -707,9 +707,9 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
   const { kind, id } = route;
   loading('Loading tunes…');
   // Filtering and sorting happen in the browser over the whole list, so the
-  // API is asked for the plain list only (plus "include versions" on riddims).
+  // API is asked for the plain list only. (Re-licks are separate riddims the
+  // visitor already picked between in search; they are linked from the header.)
   const params: Record<string, string> = {};
-  if (kind === 'riddim' && route.versions) params.versions = 'include';
   const base = `/api/${KIND_PATH[kind]}/${id}/tunes`;
   const [list, riddim] = await Promise.all([
     api<TuneList>(base + (Object.keys(params).length ? '?' + new URLSearchParams(params) : ''), signal),
@@ -753,7 +753,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
   const src = external(ref?.url ?? null, 'View on Riddim-ID ↗', 'src');
   if (src) head.appendChild(h('p', {}, src));
 
-  // ---- controls: live filter (Artist / Title / Label) + "include versions" on riddims
+  // ---- controls: live filter (Artist / Title / Label)
   const controls = h('form', { class: 'controls', role: 'search', 'aria-label': 'Filter this list' });
   const filterLabel = kind === 'label' ? 'Filter by artist or title' : 'Filter by artist, title or label';
   const filter = h('input', {
@@ -761,15 +761,6 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
     maxlength: 100, value: route.f, autocomplete: 'off', spellcheck: 'false', enterkeyhint: 'done',
   });
   append(controls, [filter]);
-  let versions: HTMLInputElement | null = null;
-  if (kind === 'riddim') {
-    versions = h('input', { type: 'checkbox', name: 'versions' });
-    versions.checked = route.versions;
-    append(controls, [h('label', { class: 'check' }, versions, ' Include versions')]);
-    versions.addEventListener('change', () =>
-      navigate(withQuery(location.pathname, { f: filter.value.trim() || null, versions: versions!.checked ? '1' : null }), true),
-    );
-  }
   controls.addEventListener('submit', (e) => {
     e.preventDefault();
     filter.blur(); // filtering is live; Enter just closes the keyboard
@@ -836,7 +827,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
   };
 
   const table: TuneTable = tuneTable(list.tunes, {
-    hideRiddim: kind === 'riddim' && !route.versions,
+    hideRiddim: kind === 'riddim',
     hideLabel: kind === 'label',
     onSort: () => {
       loadAll();
@@ -852,7 +843,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
     clearTimeout(urlTimer);
     urlTimer = window.setTimeout(() => {
       // Keep the filter in the URL (shareable) without re-rendering the page.
-      history.replaceState(null, '', withQuery(location.pathname, { f: filter.value.trim() || null, versions: route.versions ? '1' : null }));
+      history.replaceState(null, '', withQuery(location.pathname, { f: filter.value.trim() || null }));
     }, 300);
   };
   filter.addEventListener('input', applyFilter);

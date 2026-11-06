@@ -203,7 +203,6 @@ p.state[role="status"] { flex-direction: row; align-items: center; gap: 8px; }
   border-radius: 0 0 var(--radius) var(--radius);
 }
 .controls input[type="search"] { font: inherit; font-size: 15px; padding: 6px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--fg); flex: 1 1 220px; max-width: 360px; }
-.controls .check { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; cursor: pointer; font-size: 14px; }
 /* lists without a filter (artist/label) only have the sort select: keep the toolbar slim */
 .controls:not(:has(input)) { padding-block: 8px; }
 .count { margin: 18px 2px 8px; font-size: 13px; color: var(--fg-2); }

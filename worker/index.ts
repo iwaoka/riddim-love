@@ -130,7 +130,7 @@ function canonicalRedirect(request: Request, url: URL): Response | null {
   return isWorkersDev || isHttp ? Response.redirect(ORIGIN + url.pathname + url.search, 301) : null;
 }
 
-const LIST_PARAMS = ['f', 'sort', 'versions'];
+const LIST_PARAMS = ['f', 'sort'];
 
 /** EU/EEA, UK and Switzerland: analytics needs consent first (see public/analytics.js). */
 const CONSENT_COUNTRIES = new Set(['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'IS', 'LI', 'NO', 'GB', 'CH']);
