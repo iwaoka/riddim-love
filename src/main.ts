@@ -273,7 +273,7 @@ function icon(name: keyof typeof ICONS, size = 18): SVGSVGElement {
 /** Copy "Artist - Title" (local only, no request); brief check-mark feedback. */
 function copyButton(text: string): HTMLButtonElement {
   const label = `Copy “${text}”`;
-  const btn = h('button', { type: 'button', class: 'act act-icon copy', title: label, 'aria-label': label }, icon('copy', 16));
+  const btn = h('button', { type: 'button', class: 'act act-icon copy act-copy', title: label, 'aria-label': label }, icon('copy', 16));
   let timer = 0;
   btn.addEventListener('click', async () => {
     const ok = await copyToClipboard(text);
@@ -300,7 +300,7 @@ function externalButton(id: ExternalSearch['id'], row: Pick<Row, 'artists' | 'ti
     href: externalSearchUrl(id, row.artists, row.title),
     target: '_blank',
     rel: 'noopener noreferrer',
-    class: isYt ? 'act act-yt' : 'act act-icon act-ext',
+    class: isYt ? 'act act-yt' : 'act act-icon act-ext act-discogs',
     title: label,
     'aria-label': label,
   },
@@ -315,7 +315,7 @@ function infoButton(row: Row): HTMLAnchorElement {
   const label = `Details for ${displayText(row.artists, row.title)}`;
   return h('a', {
     href,
-    class: 'act act-icon',
+    class: 'act act-icon act-info',
     title: label,
     'aria-label': label,
     onclick: ((e: MouseEvent) => {

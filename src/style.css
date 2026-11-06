@@ -256,13 +256,9 @@ p.state[role="status"] { flex-direction: row; align-items: center; gap: 8px; }
 .act-ext.act-icon { width: auto; padding: 0 7px; }
 .act-text-wide { display: none; }
 @media (min-width: 1100px) { .act-text-wide { display: inline; } }
-/* YouTube: the primary action — solid, recognisable */
-.act-yt { color: #fff; background: var(--yt); border-color: var(--yt); padding: 0 10px 0 8px; }
-.act-yt:hover, a.act-yt:hover { color: #fff; background: var(--yt-hover); border-color: var(--yt-hover); }
+/* YouTube icon is a filled play triangle */
 .act-yt svg { fill: currentColor; }
-/* copy feedback */
-.act.copy.done { color: var(--ok); border-color: var(--ok); background: var(--accent-soft); }
-.act.copy.fail { color: var(--err); border-color: var(--err); }
+
 
 /* names table (riddim / artist / label search) */
 .names-table td { padding: 0; }
@@ -301,7 +297,6 @@ p.state[role="status"] { flex-direction: row; align-items: center; gap: 8px; }
 .acts-lg .act-icon { width: 38px; }
 .acts-lg .act-ext.act-icon { width: auto; padding: 0 12px; }
 .acts-lg .act-text-wide { display: inline; }
-.acts-lg .act-yt { background: var(--yt); border-color: var(--yt); padding: 0 14px 0 11px; }
 .tune > p.muted:last-child { margin: 0; padding-top: 12px; border-top: 1px dashed var(--line); font-size: 13px; }
 
 /* ---------- footer ---------- */
@@ -369,7 +364,6 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
   /* touch: 40px targets, icons only; YouTube stays solid red */
   .tunes .acts { gap: 3px; }
   .tunes .act { height: 40px; min-width: 40px; width: 40px; padding: 0; border-color: var(--line); background: var(--surface); }
-  .tunes .act-yt { background: var(--yt); border-color: var(--yt); color: #fff; }
   .tunes .act-text { display: none; }
 
   .names-table .c-note { width: 38%; }
@@ -378,3 +372,34 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
   body.home .top { padding-top: 8vh; }
   body.home .search { order: 0; padding: 12px; }
 }
+
+/* ---------- action button colours (last, so they win over layout rules) ----------
+   YouTube red · Discogs black · Info blue · Copy grey; white icon/text on each. */
+:root {
+  --btn-yt: #cc1f1a;      --btn-yt-hover: #a91913;
+  --btn-discogs: #16181a; --btn-discogs-hover: #000000; --btn-discogs-edge: #16181a;
+  --btn-info: #1a6ed8;    --btn-info-hover: #1559b0;
+  --btn-copy: #6b7280;    --btn-copy-hover: #545a64;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --btn-yt: #c42b1c;      --btn-yt-hover: #dc3b2b;
+    --btn-discogs: #000000; --btn-discogs-hover: #000000; --btn-discogs-edge: #4a5058; /* edge keeps black visible on dark */
+    --btn-info: #2a6fd0;    --btn-info-hover: #3b82e6;
+    --btn-copy: #5b626b;    --btn-copy-hover: #6c747e;
+  }
+}
+.act.act-yt      { --c: var(--btn-yt);      --c-h: var(--btn-yt-hover);      --e: var(--btn-yt); }
+.act.act-discogs { --c: var(--btn-discogs); --c-h: var(--btn-discogs-hover); --e: var(--btn-discogs-edge); }
+.act.act-info    { --c: var(--btn-info);    --c-h: var(--btn-info-hover);    --e: var(--btn-info); }
+.act.act-copy    { --c: var(--btn-copy);    --c-h: var(--btn-copy-hover);    --e: var(--btn-copy); }
+.act.act-yt, .act.act-discogs, .act.act-info, .act.act-copy {
+  color: #fff; background: var(--c); border-color: var(--e);
+}
+.act.act-yt:hover, .act.act-discogs:hover, .act.act-info:hover, .act.act-copy:hover {
+  color: #fff; background: var(--c-h); border-color: var(--c-h);
+}
+.act.act-discogs:hover { border-color: var(--e); }
+/* copy feedback */
+.act.act-copy.done { background: #0a7a3a; border-color: #0a7a3a; color: #fff; }
+.act.act-copy.fail { background: #b3261e; border-color: #b3261e; color: #fff; }
