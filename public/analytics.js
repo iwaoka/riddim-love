@@ -61,7 +61,7 @@
     var p = document.createElement('p');
     p.appendChild(document.createTextNode('We use Google Analytics cookies to see how RIDDIM.LOVE is used. '));
     var a = document.createElement('a');
-    a.href = '/privacy.html';
+    a.href = '/privacy';
     a.textContent = 'Privacy';
     p.appendChild(a);
     var actions = document.createElement('div');
