@@ -9,7 +9,7 @@ import { sortRows, type SortDir, type SortKey } from '../shared/sort';
 const HOME_TITLE = 'RIDDIM.LOVE — Riddim search for reggae & dancehall selectors';
 const HOME_DESCRIPTION =
   'Search reggae and dancehall riddims, tunes, artists and labels. See every tune on a riddim with artist, label and year, then jump to YouTube or Discogs. Data provided by Riddim-ID.';
-import type { ApiError, ListKind, NameHit, Ref, Riddim, RiddimRef, SearchResult, SearchType, SsrData, Tune, TuneHit, TuneList } from '../shared/types';
+import type { ApiError, ListKind, NameHit, Ref, Riddim, RiddimRef, SearchResult, SearchType, SsrData, SuggestResult, Tune, TuneHit, TuneList } from '../shared/types';
 import { append, h, safeExternal } from './dom';
 
 // ---------- elements ----------
@@ -708,13 +708,7 @@ async function renderSearch(q: string, type: SearchType, signal: AbortSignal) {
   if (!n && type === 'tune' && !pair && /\s/.test(q.trim()) && (await artistPrefixSearch(q, signal))) return;
   if (signal.aborted) return;
   if (!n) {
-    main.replaceChildren(
-      h('div', { class: 'state' },
-        h('p', {}, type === 'tune' ? `No tune titles match “${res.query}”.` : `No ${TYPE_UI[type].plural} match “${res.query}”.`),
-        h('p', { class: 'muted' }, pair ? `No artist page is named “${pair.primary}” either. Check the spelling, or search the title alone.` : NO_MATCH_TIP[type]),
-      ),
-    );
-    announce('No matches');
+    await renderNoMatch(res.query, type, pair ? `No artist page is named “${pair.primary}” either. Check the spelling, or search the title alone.` : NO_MATCH_TIP[type], signal);
     return;
   }
 
@@ -747,6 +741,70 @@ async function renderSearch(q: string, type: SearchType, signal: AbortSignal) {
  * here (artist search, then title search as the fallback).
  * Returns true when it rendered something; false → run the plain title search.
  */
+const SUGGEST_MAX = 6;
+const TYPE_NAME: Record<SearchType, string> = { riddim: 'Riddim', tune: 'Tune', artist: 'Artist', label: 'Label' };
+
+/**
+ * Nothing matched: one search across all four types (one request, only now),
+ * shown as "Did you mean" links plus one-click re-searches in the types that
+ * did match, and a button back into the search box.
+ */
+async function renderNoMatch(q: string, type: SearchType, tip: string, signal: AbortSignal) {
+  const edit = h('button', { type: 'button', class: 'retry' }, 'Edit search');
+  edit.addEventListener('click', () => {
+    input.focus();
+    input.select();
+  });
+  const head = [
+    h('p', {}, type === 'tune' ? `No tune titles match “${q}”.` : `No ${TYPE_UI[type].plural} match “${q}”.`),
+  ];
+  const paint = (extra: HTMLElement[]) => main.replaceChildren(h('div', { class: 'state no-match' }, ...head, ...extra, h('p', { class: 'muted' }, tip), h('p', {}, edit)));
+  paint([h('p', { class: 'muted' }, 'Looking in riddims, tunes, artists and labels…')]);
+
+  let s: SuggestResult | null = null;
+  try {
+    s = await api<SuggestResult>('/api/suggest?' + new URLSearchParams({ q }), signal);
+  } catch {
+    /* suggestions are optional */
+  }
+  if (signal.aborted) return;
+
+  type Item = { type: SearchType; el: HTMLElement };
+  const items: Item[] = [
+    ...(s?.names ?? []).filter((x) => x.type !== type && isSearchType(x.type)).map((x): Item => ({
+      type: x.type as SearchType,
+      el: h('li', {}, h('span', { class: 'badge' }, TYPE_NAME[x.type as SearchType]), ' ', link(listHref(x.type as ListKind, x), x.name), x.year ? h('span', { class: 'muted' }, ` ${x.year}`) : null),
+    })),
+    ...(type === 'tune' ? [] : (s?.tunes ?? []).map((t): Item => ({
+      type: 'tune',
+      el: h('li', {}, h('span', { class: 'badge' }, 'Tune'), ' ', link(tunePath(t), displayText(t.artists, t.title)), t.year ? h('span', { class: 'muted' }, ` ${t.year}`) : null),
+    }))),
+  ];
+  if (!items.length) {
+    paint([]);
+    announce('No matches');
+    return;
+  }
+  // Re-search buttons for each type that turned something up (in upstream order).
+  const types = [...new Set(items.map((i) => i.type))];
+  const again = h('p', { class: 'search-in' }, 'Search “', q, '” in: ',
+    ...types.map((t) => {
+      const b = h('button', { type: 'button', class: 'chip' }, TYPE_NAME[t]);
+      b.addEventListener('click', () => {
+        showType(t);
+        navigate(qs({ type: t, q }), true);
+      });
+      return b;
+    }),
+  );
+  paint([
+    h('p', { class: 'did-you-mean' }, 'Did you mean:'),
+    h('ul', { class: 'suggest' }, ...items.slice(0, SUGGEST_MAX).map((i) => i.el)),
+    again,
+  ]);
+  announce(`No matches. ${Math.min(items.length, SUGGEST_MAX)} suggestions.`);
+}
+
 /**
  * Beta: "Artist Title" with no separator, tried only after the title search
  * found nothing (one more request). The artist search on the whole query

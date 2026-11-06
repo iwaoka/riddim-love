@@ -41,6 +41,7 @@ Data provided by [Riddim-ID](https://riddim-id.com/) via its public API v1. RIDD
 | Route | Upstream |
 |---|---|
 | `GET /api/search?type=riddim|tune|artist|label&q=` | `/v1/search?types=<type>&limit=50` (one request) |
+| `GET /api/suggest?q=` | `/v1/search?types=riddim,tune,artist,label&limit=50` — only after a search found nothing, for “Did you mean” |
 | `GET /api/riddims/:id` | `/v1/riddims/:id` |
 | `GET /api/riddims/:id/tunes?cursor=&sort=&q=&versions=include` | `/v1/riddims/:id/tunes` |
 | `GET /api/{artists,producers,labels}/:id/tunes?cursor=&sort=` | same path upstream |

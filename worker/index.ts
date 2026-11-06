@@ -4,7 +4,7 @@
 
 import { normalizeCountry, type CountryCode } from '../shared/dig';
 import { ORIGIN, PAGE_KINDS, pagePath, parsePagePath, type PageKind } from '../shared/seo';
-import type { ApiError, SearchResult } from '../shared/types';
+import type { ApiError, NameHit, SearchResult, SuggestResult, TuneHit } from '../shared/types';
 import { loadEntity, loadRiddim, loadTune, loadTunes } from './data';
 import { servePage } from './pages';
 import * as P from './project';
@@ -72,6 +72,22 @@ async function handleApi(url: URL, ctx: ExecutionContext): Promise<Response> {
       names: type === 'tune' ? [] : (hits.map(P.nameHit).filter((x) => x !== null && x.type === type) as SearchResult['names']),
       tunes: type === 'tune' ? (hits.map(P.tuneHit).filter((x) => x !== null) as SearchResult['tunes']) : [],
       limit: SEARCH_LIMIT,
+    };
+    return json(result);
+  }
+
+  // "Did you mean": one search across all four types, asked for by the app
+  // only after a search found nothing (so a typed riddim name in the Tune tab
+  // still turns up).
+  if (path === '/api/suggest') {
+    onlyParams(p, ['q']);
+    const q = parseQuery(p.get('q'));
+    const body = await upstream('/search', { q, types: SEARCH_TYPES.join(','), limit: SEARCH_LIMIT }, ctx);
+    const hits = Array.isArray(data(body)) ? (data(body) as unknown[]) : [];
+    const result: SuggestResult = {
+      query: q,
+      names: hits.map(P.nameHit).filter((x): x is NameHit => x !== null && x.type !== 'producer'),
+      tunes: hits.map(P.tuneHit).filter((x): x is TuneHit => x !== null),
     };
     return json(result);
   }

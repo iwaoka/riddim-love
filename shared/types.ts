@@ -48,6 +48,13 @@ export interface TuneHit {
 
 export type SearchType = 'riddim' | 'tune' | 'artist' | 'label';
 
+/** /api/suggest: one search across riddims, tunes, artists and labels (50 hits in all). */
+export interface SuggestResult {
+  query: string;
+  names: NameHit[];
+  tunes: TuneHit[];
+}
+
 export interface SearchResult {
   query: string;
   type: SearchType;
