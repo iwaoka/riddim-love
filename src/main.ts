@@ -239,7 +239,6 @@ const ICONS = {
   x: ['M18 6 6 18', 'm6 6 12 12'],
   play: ['poly:6 3 20 12 6 21 6 3'],
   disc: ['circle:12,12,10', 'circle:12,12,2'],
-  info: ['circle:12,12,10', 'M12 16v-4', 'M12 8h.01'],
   share: ['M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8', 'M16 6l-4-4-4 4', 'M12 2v13'],
 } as const;
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -343,22 +342,6 @@ function shareButton(title: string, url: string): HTMLButtonElement {
     }, 1500);
   });
   return btn;
-}
-
-function infoButton(row: Row): HTMLAnchorElement {
-  const href = tunePath(row);
-  const label = `Details for ${displayText(row.artists, row.title)}`;
-  return h('a', {
-    href,
-    class: 'act act-info',
-    title: label,
-    'aria-label': label,
-    onclick: ((e: MouseEvent) => {
-      if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
-      e.preventDefault();
-      navigate(href);
-    }) as EventListener,
-  }, icon('info', 16), actLabel('Info'));
 }
 
 // ---------- Dig: one shared popover menu for every row ----------
@@ -488,8 +471,9 @@ function digButton(row: Pick<Row, 'artists' | 'title'>): HTMLButtonElement {
 }
 
 /** Row actions, in priority order: YouTube → Info → Copy → Dig. */
-function rowActions(row: Row, { info = true } = {}): (HTMLElement | null)[] {
-  return [youtubeButton(row), info ? infoButton(row) : null, copyButton(copyText(row.artists, row.title)), digButton(row)];
+/** YouTube → Copy → Dig. Tune details are reached by clicking the title. */
+function rowActions(row: Row): HTMLElement[] {
+  return [youtubeButton(row), copyButton(copyText(row.artists, row.title)), digButton(row)];
 }
 
 type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean };
@@ -499,7 +483,7 @@ function tuneRow(row: Row, opts: TableOpts = {}): HTMLTableRowElement {
   return h('tr', { class: row.is_original ? 'orig' : null },
     h('td', { class: 'c-artist' }, ...(row.artists.length ? joinLinks(row.artists, 'artist') : [dash()])),
     h('td', { class: 'c-title' },
-      row.title,
+      link(tunePath(row), row.title, 'tune-link'),
       row.is_original ? h('span', { class: 'badge', title: 'The original tune this riddim is named after' }, 'Original') : null,
     ),
     opts.hideRiddim ? null : h('td', { class: 'c-riddim' }, row.riddim ? link(listHref('riddim', row.riddim), row.riddim.name) : dash()),
@@ -943,7 +927,7 @@ async function renderTune(id: number, signal: AbortSignal) {
       h('p', { class: 'kind' }, 'Tune'),
       h('h1', { class: 'at' }, text),
       h('dl', {}, ...rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, ...v)])),
-      h('p', { class: 'acts acts-lg' }, ...rowActions(t, { info: false }), shareButton(text, ORIGIN + tunePath(t))),
+      h('p', { class: 'acts acts-lg' }, ...rowActions(t), shareButton(text, ORIGIN + tunePath(t))),
       h('p', { class: 'muted' },
         'Source: ',
         external(t.riddim?.url ?? null, `${t.riddim?.name ?? 'Riddim'} on Riddim-ID ↗`) ?? external('https://riddim-id.com/', 'Riddim-ID ↗'),

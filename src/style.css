@@ -249,6 +249,9 @@ p.state[role="status"] { flex-direction: row; align-items: center; gap: 8px; }
 
 .c-riddim a, .c-label a { text-decoration: none; }
 .c-riddim a:hover, .c-label a:hover { text-decoration: underline; color: var(--accent); }
+/* title → tune details (replaces the old Info button) */
+.tunes .tune-link { color: inherit; text-decoration: none; }
+.tunes .tune-link:hover { text-decoration: underline; color: var(--accent); }
 .badge { display: inline-block; margin-left: 6px; font-size: 10.5px; font-weight: 700; padding: 0 7px; border-radius: 99px; color: var(--accent); background: var(--accent-soft); vertical-align: 1px; letter-spacing: 0.02em; }
 /* ---------- row actions: YouTube → Discogs → Info → Copy ---------- */
 .acts { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; white-space: nowrap; vertical-align: middle; }
@@ -394,31 +397,28 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 :root {
   --btn-yt: #b5524c;      --btn-yt-hover: #a3453f;
   --btn-discogs: #3b4046; --btn-discogs-hover: #2e3237; --btn-discogs-edge: #3b4046;
-  --btn-info: #4f7bb3;    --btn-info-hover: #436ca1;
   --btn-copy: #8a9099;    --btn-copy-hover: #777e87;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --btn-yt: #9c4842;      --btn-yt-hover: #ad5149;
     --btn-discogs: #2b2f34; --btn-discogs-hover: #33383e; --btn-discogs-edge: #454b52; /* edge keeps it visible on dark */
-    --btn-info: #40679b;    --btn-info-hover: #4a74ab;
     --btn-copy: #5d646c;    --btn-copy-hover: #69717a;
   }
 }
 .act.act-yt      { --c: var(--btn-yt);      --c-h: var(--btn-yt-hover);      --e: var(--btn-yt); }
 .act.act-dig     { --c: var(--btn-discogs); --c-h: var(--btn-discogs-hover); --e: var(--btn-discogs-edge); }
-.act.act-info    { --c: var(--btn-info);    --c-h: var(--btn-info-hover);    --e: var(--btn-info); }
 .act.act-copy    { --c: var(--btn-copy);    --c-h: var(--btn-copy-hover);    --e: var(--btn-copy); }
-.act.act-yt, .act.act-dig, .act.act-info, .act.act-copy {
+.act.act-yt, .act.act-dig, .act.act-copy {
   color: #fff; background: var(--c); border-color: var(--e);
 }
-.act.act-yt:hover, .act.act-dig:hover, .act.act-info:hover, .act.act-copy:hover,
+.act.act-yt:hover, .act.act-dig:hover, .act.act-copy:hover,
 .act.act-dig.open {
   color: #fff; background: var(--c-h); border-color: var(--c-h);
 }
 .act.act-dig:hover, .act.act-dig.open { border-color: var(--e); }
 .act.act-dig.open { box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 35%, transparent); }
-.act.act-yt:focus-visible, .act.act-dig:focus-visible, .act.act-info:focus-visible, .act.act-copy:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.act.act-yt:focus-visible, .act.act-dig:focus-visible, .act.act-copy:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* copy feedback */
 .act.act-copy.done { background: #3f8a5c; border-color: #3f8a5c; color: #fff; }
 .act.act-copy.fail { background: #a3453f; border-color: #a3453f; color: #fff; }
