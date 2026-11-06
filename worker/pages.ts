@@ -71,9 +71,9 @@ function countLine(list: TuneList): string {
 
 const KIND_LABEL: Record<PageKind, string> = { riddim: 'Riddim', artist: 'Artist', producer: 'Producer', label: 'Label', tune: 'Tune' };
 
-function listHead(kind: ListKind, meta: PageMeta, extra: string[], src: string | null, year: number | null = null): string {
+function listHead(kind: ListKind, meta: PageMeta, extra: string[], src: string | null): string {
   return (
-    `<header class="list-head"><p class="kind">${KIND_LABEL[kind]}</p><h1>${esc(meta.h1)}${yearSpan(year)}</h1>` +
+    `<header class="list-head"><p class="kind">${KIND_LABEL[kind]}</p><h1>${esc(meta.h1)}</h1>` +
     extra.filter(Boolean).join('') +
     (src ? `<p class="src">${ext(src, 'View on Riddim-ID ↗')}</p>` : '') +
     `</header>`
@@ -113,9 +113,8 @@ async function buildRiddim(id: number, ctx: ExecutionContext, stats: UpstreamSta
   const meta = riddimMeta(r, list.total, list.tunes);
   const canonicalPath = pagePath('riddim', id, r.slug);
   const facts: string[] = [];
-  const by = r.producers.length ? `Produced by ${joinRefs(r.producers, 'producer')}` : '';
-  const vo = r.version_of ? `Version of ${a(refPath('riddim', r.version_of), r.version_of.name)}` : '';
-  if (by || vo) facts.push(`<p class="facts">${[by, vo].filter(Boolean).join(' · ')}</p>`);
+  // No year / producer in the head: the list also holds same-name re-licks.
+  if (r.version_of) facts.push(`<p class="facts">Version of ${a(refPath('riddim', r.version_of), r.version_of.name)}</p>`);
   if (r.alternate_names.length) facts.push(`<p class="facts muted">Also known as ${esc(r.alternate_names.join(', '))}</p>`);
   if (r.versions.length) {
     facts.push(
@@ -128,7 +127,7 @@ async function buildRiddim(id: number, ctx: ExecutionContext, stats: UpstreamSta
   return {
     canonicalPath,
     meta,
-    main: listHead('riddim', meta, facts, r.url, r.year) + countLine(list) + tuneTable(list.tunes, { riddim: true }),
+    main: listHead('riddim', meta, facts, r.url) + countLine(list) + tuneTable(list.tunes, { riddim: true }),
     jsonLd: [
       crumbs([{ name: meta.h1, url }]),
       { '@context': 'https://schema.org', '@type': 'CollectionPage', name: meta.h1, url, description: meta.description, ...(r.url ? { sameAs: r.url } : {}), mainEntity: itemList(list) },

@@ -731,13 +731,12 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
 
   const head = h('header', { class: 'list-head' },
     h('p', { class: 'kind' }, KIND_LABEL[kind]),
-    h('h1', {}, pm.h1, riddim?.year ? h('span', { class: 'muted' }, ` ${riddim.year}`) : null),
+    h('h1', {}, pm.h1),
   );
   if (riddim) {
-    const facts: (Node | string)[] = [];
-    if (riddim.producers.length) facts.push('Produced by ', ...joinLinks(riddim.producers, 'producer'));
-    if (riddim.version_of) facts.push(facts.length ? ' · ' : '', 'Version of ', link(listHref('riddim', riddim.version_of), riddim.version_of.name));
-    if (facts.length) head.appendChild(h('p', { class: 'facts' }, ...facts));
+    // No year / producer here: a riddim list also holds later re-licks under the
+    // same name (other years, other producers), so the original's facts mislead.
+    if (riddim.version_of) head.appendChild(h('p', { class: 'facts' }, 'Version of ', link(listHref('riddim', riddim.version_of), riddim.version_of.name)));
     if (riddim.alternate_names.length) head.appendChild(h('p', { class: 'facts muted' }, 'Also known as ' + riddim.alternate_names.join(', ')));
     if (riddim.versions.length) {
       head.appendChild(
