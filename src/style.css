@@ -235,6 +235,12 @@ p.state[role="status"] { flex-direction: row; align-items: center; gap: 8px; }
 .tunes .c-artist { font-weight: 600; width: 24%; }
 .tunes .c-title { width: 30%; }
 .tunes .c-riddim, .tunes .c-label { color: var(--fg-2); }
+/* Artist / producer lists show both Riddim and Label: share the width out
+   so neither is squeezed (fixed shares, so columns don't jump as rows load). */
+.tunes:has(th.c-riddim):has(th.c-label) .c-artist { width: 20%; }
+.tunes:has(th.c-riddim):has(th.c-label) .c-title { width: 24%; }
+.tunes:has(th.c-riddim):has(th.c-label) .c-riddim { width: 15%; }
+.tunes:has(th.c-riddim):has(th.c-label) .c-label { width: 12%; }
 .tunes .c-year { width: 4em; text-align: right; font-variant-numeric: tabular-nums; color: var(--fg-3); }
 .tunes td.c-act, .tunes th.c-act { display: table-cell; width: 1%; white-space: nowrap; text-align: right; padding-right: 8px; }
 .c-year { font-variant-numeric: tabular-nums; color: var(--fg-3); }
