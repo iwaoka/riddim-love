@@ -155,11 +155,19 @@ function visitorCountry(request: Request, url: URL, env: Env): CountryCode {
 function markVisitor(request: Request, url: URL, env: Env, res: Response): Response {
   if (!(res.headers.get('Content-Type') ?? '').includes('text/html')) return res;
   const country = visitorCountry(request, url, env);
+  // The home view (no search words) starts with body.home, so the header shows
+  // the word mark from the first paint instead of flashing the logo image.
+  const isHome = url.pathname === '/' && !url.searchParams.get('q');
   const out = new HTMLRewriter()
     .on('html', {
       element(el) {
         if (country) el.setAttribute('data-country', country);
         if (country && CONSENT_COUNTRIES.has(country)) el.setAttribute('data-consent', 'required');
+      },
+    })
+    .on('body', {
+      element(el) {
+        if (isHome) el.setAttribute('class', 'home');
       },
     })
     .transform(res);
