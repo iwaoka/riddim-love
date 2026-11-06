@@ -129,6 +129,29 @@ function canonicalRedirect(request: Request, url: URL): Response | null {
 
 const LIST_PARAMS = ['f', 'sort', 'versions'];
 
+/** EU/EEA, UK and Switzerland: analytics needs consent first (see public/analytics.js). */
+const CONSENT_COUNTRIES = new Set(['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'IS', 'LI', 'NO', 'GB', 'CH']);
+
+/**
+ * Marks HTML for visitors who must be asked before analytics runs. Applied to
+ * the final response (after any HTML cache), so cached pages stay shared.
+ */
+function markConsent(request: Request, res: Response): Response {
+  const country = (request.cf as { country?: string } | undefined)?.country ?? '';
+  if (!CONSENT_COUNTRIES.has(country)) return res;
+  if (!(res.headers.get('Content-Type') ?? '').includes('text/html')) return res;
+  const out = new HTMLRewriter()
+    .on('html', {
+      element(el) {
+        el.setAttribute('data-consent', 'required');
+      },
+    })
+    .transform(res);
+  const marked = new Response(out.body, out);
+  marked.headers.append('Vary', 'CF-IPCountry');
+  return marked;
+}
+
 /**
  * The HTML shell at "/": the home page and the search view (?type=&q=).
  * - Old query-string detail URLs (?riddim=18, ?tune=759, …) → 301 to the
@@ -168,10 +191,10 @@ export default {
       if (!isRead) return env.ASSETS.fetch(request);
       const redirect = canonicalRedirect(request, url);
       if (redirect) return redirect;
-      if (url.pathname === '/') return serveShell(env, url, request);
+      if (url.pathname === '/') return markConsent(request, await serveShell(env, url, request));
       if (url.pathname === '/sitemap.xml') return serveSitemap(ctx);
       const page = parsePagePath(url.pathname);
-      if (page) return servePage(request, env, ctx, url, page);
+      if (page) return markConsent(request, await servePage(request, env, ctx, url, page));
       return env.ASSETS.fetch(request);
     }
 

@@ -726,6 +726,21 @@ async function renderTune(id: number, signal: AbortSignal) {
 }
 
 // ---------- render loop ----------
+/**
+ * Analytics for in-app page changes (see public/analytics.js). The first load
+ * is counted by Google Tag Manager itself; later views are reported once the
+ * view has rendered, so the page title is the new one.
+ */
+let initialView = true;
+function trackPageView(signal: AbortSignal) {
+  if (signal.aborted) return;
+  if (initialView) {
+    initialView = false;
+    return;
+  }
+  (window as unknown as { rlPageView?: () => void }).rlPageView?.();
+}
+
 async function render() {
   navController?.abort();
   const ctrl = new AbortController();
@@ -744,6 +759,7 @@ async function render() {
     else if (route.view === 'search') await renderSearch(route.q, route.type, ctrl.signal);
     else if (route.view === 'list') await renderList(route, ctrl.signal);
     else await renderTune(route.id, ctrl.signal);
+    trackPageView(ctrl.signal);
   } catch (e) {
     if (ctrl.signal.aborted) return;
     showError(e, () => {
