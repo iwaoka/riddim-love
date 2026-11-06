@@ -455,3 +455,12 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 .dig-menu a:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); }
 .dig-host { font-size: 12px; font-weight: 400; color: var(--fg-3); }
 @media (max-width: 720px) { .dig-menu a { padding: 12px 12px; } } /* larger touch targets */
+
+/* ---------- list filter ---------- */
+.controls input[type="search"][name="f"] { flex: 1 1 260px; max-width: 420px; }
+.tunes tbody tr.empty td { padding: 18px 14px !important; color: var(--fg-2); text-align: left; }
+.tunes tbody tr.empty:hover { background: transparent; }
+@media (max-width: 720px) {
+  .tunes tbody tr.empty { display: block; }
+  .controls input[type="search"][name="f"] { max-width: none; flex-basis: 100%; }
+}

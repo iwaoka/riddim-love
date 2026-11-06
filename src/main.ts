@@ -2,6 +2,7 @@ import './style.css';
 import { digProvidersFor, normalizeCountry } from '../shared/dig';
 import { copyText, displayText, externalSearchUrl, searchText } from '../shared/format';
 import { labelMeta, ORIGIN, parsePagePath, personMeta, refPath, riddimMeta, tuneMeta, tunePath, type PageMeta } from '../shared/seo';
+import { filterWords, matches } from '../shared/filter';
 import { sortRows, type SortDir, type SortKey } from '../shared/sort';
 
 const HOME_TITLE = 'RIDDIM.LOVE — Riddim search for reggae & dancehall selectors';
@@ -477,15 +478,20 @@ const SORT_NAMES: Record<SortKey, string> = { artist: 'Artist', title: 'Title', 
 
 interface TuneTable {
   el: HTMLElement;
-  /** Appends rows (e.g. "Load more"); re-sorts when a column sort is active. */
+  /** Appends rows (e.g. a further page); re-paints when a sort or filter is active. */
   add(rows: Row[]): void;
   /** Current column sort, or null for the source order. */
   sort(): { key: SortKey; dir: SortDir } | null;
+  /** Shows only rows whose Artist / Title / Label contain every word of `query` ("" = all). */
+  setFilter(query: string): void;
+  /** Rows held / rows currently shown. */
+  counts(): { held: number; shown: number };
 }
 
 /**
  * Tune table. Column headers are sort buttons (click: ascending, again: descending).
- * Sorting is client-side over the rows held by the table — no extra requests.
+ * Sorting and filtering are client-side over the rows held by the table — no
+ * requests of their own (the list page loads the remaining pages when needed).
  */
 function tuneTable(
   rows: Row[],
@@ -493,13 +499,22 @@ function tuneTable(
 ): TuneTable {
   const all = [...rows];
   let sort = opts.sort ?? null;
+  let words: string[] = [];
+  let shown = all.length;
   const tbody = h('tbody', {});
   const ths = new Map<SortKey, HTMLTableCellElement>();
+  const cols = 4 + (opts.hideRiddim ? 0 : 1) + (opts.hideLabel ? 0 : 1);
 
   const paint = () => {
     closeDig(false); // rows are about to be replaced
-    const ordered = sort ? sortRows(all, sort.key, sort.dir) : all;
-    tbody.replaceChildren(...ordered.map((r) => tuneRow(r, opts)));
+    const kept = words.length ? all.filter((r) => matches(r, words)) : all;
+    const ordered = sort ? sortRows(kept, sort.key, sort.dir) : kept;
+    shown = ordered.length;
+    tbody.replaceChildren(
+      ...(ordered.length
+        ? ordered.map((r) => tuneRow(r, opts))
+        : [h('tr', { class: 'empty' }, h('td', { colspan: cols }, 'No tunes match this filter.'))]),
+    );
     for (const [key, th] of ths) {
       const active = sort?.key === key;
       th.setAttribute('aria-sort', active ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : 'none');
@@ -545,10 +560,20 @@ function tuneTable(
     el,
     add(more) {
       all.push(...more);
-      if (sort) paint();
-      else append(tbody, more.map((r) => tuneRow(r, opts)));
+      if (sort || words.length) paint();
+      else {
+        append(tbody, more.map((r) => tuneRow(r, opts)));
+        shown = all.length;
+      }
     },
     sort: () => sort,
+    setFilter(query) {
+      const next = filterWords(query);
+      if (next.join(' ') === words.join(' ')) return;
+      words = next;
+      paint();
+    },
+    counts: () => ({ held: all.length, shown }),
   };
 }
 
@@ -681,12 +706,10 @@ function nameFromTunes(kind: ListKind, id: number, tunes: Tune[]): Ref | null {
 async function renderList(route: Extract<Route, { view: 'list' }>, signal: AbortSignal) {
   const { kind, id } = route;
   loading('Loading tunes…');
+  // Filtering and sorting happen in the browser over the whole list, so the
+  // API is asked for the plain list only (plus "include versions" on riddims).
   const params: Record<string, string> = {};
-  if (route.sort) params.sort = route.sort;
-  if (kind === 'riddim') {
-    if (route.f) params.q = route.f;
-    if (route.versions) params.versions = 'include';
-  }
+  if (kind === 'riddim' && route.versions) params.versions = 'include';
   const base = `/api/${KIND_PATH[kind]}/${id}/tunes`;
   const [list, riddim] = await Promise.all([
     api<TuneList>(base + (Object.keys(params).length ? '?' + new URLSearchParams(params) : ''), signal),
@@ -730,80 +753,138 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
   const src = external(ref?.url ?? null, 'View on Riddim-ID ↗', 'src');
   if (src) head.appendChild(h('p', {}, src));
 
-  // controls
+  // ---- controls: live filter (Artist / Title / Label) + "include versions" on riddims
   const controls = h('form', { class: 'controls', role: 'search', 'aria-label': 'Filter this list' });
-  const sorts = kind === 'riddim' ? ['site', 'year', '-year', 'artist', 'title'] : ['site', 'year', '-year', 'title'];
-  const sortNames: Record<string, string> = { site: 'Default order', year: 'Oldest first', '-year': 'Newest first', artist: 'Artist A–Z', title: 'Title A–Z' };
-  const sortSel = h('select', { name: 'sort', 'aria-label': 'Sort' }, ...sorts.map((s) => h('option', { value: s === 'site' ? '' : s }, sortNames[s])));
-  sortSel.value = route.sort;
-  let filter: HTMLInputElement | null = null;
+  const filterLabel = kind === 'label' ? 'Filter by artist or title' : 'Filter by artist, title or label';
+  const filter = h('input', {
+    type: 'search', name: 'f', placeholder: filterLabel, 'aria-label': filterLabel,
+    maxlength: 100, value: route.f, autocomplete: 'off', spellcheck: 'false', enterkeyhint: 'done',
+  });
+  append(controls, [filter]);
   let versions: HTMLInputElement | null = null;
   if (kind === 'riddim') {
-    filter = h('input', { type: 'search', name: 'f', placeholder: 'Filter by title or artist', 'aria-label': 'Filter by title or artist', maxlength: 100, value: route.f });
     versions = h('input', { type: 'checkbox', name: 'versions' });
     versions.checked = route.versions;
-    append(controls, [filter, h('label', { class: 'check' }, versions, ' Include versions')]);
+    append(controls, [h('label', { class: 'check' }, versions, ' Include versions')]);
+    versions.addEventListener('change', () =>
+      navigate(withQuery(location.pathname, { f: filter.value.trim() || null, versions: versions!.checked ? '1' : null }), true),
+    );
   }
-  append(controls, [sortSel, kind === 'riddim' ? h('button', { type: 'submit' }, 'Apply') : null]);
-  const apply = () =>
-    navigate(withQuery(location.pathname, { f: filter?.value.trim() || null, sort: sortSel.value || null, versions: versions?.checked ? '1' : null }), true);
   controls.addEventListener('submit', (e) => {
     e.preventDefault();
-    apply();
+    filter.blur(); // filtering is live; Enter just closes the keyboard
   });
-  sortSel.addEventListener('change', apply);
-  versions?.addEventListener('change', apply);
 
-  const count = h('p', { class: 'count muted' });
+  // ---- the whole list: first page now, the rest only when sorting / filtering needs it
+  const CAP = 1500; // largest riddim ~520 tunes; covers nearly every label too
+  const count = h('p', { class: 'count muted', role: 'status' });
   const more = h('button', { type: 'button', class: 'more' }, 'Load more');
-  let shown = list.tunes.length;
   let cursor = list.next_cursor;
+  let held = list.tunes.length;
+  let bulk: Promise<void> | null = null;
+  let failed = false;
+  const total = () => list.total ?? (cursor ? null : held);
+
+  async function loadPage(): Promise<boolean> {
+    if (!cursor) return false;
+    const page = await api<TuneList>(base + '?' + new URLSearchParams({ ...params, cursor }));
+    if (signal.aborted) return false;
+    table.add(page.tunes);
+    held += page.tunes.length;
+    cursor = page.next_cursor;
+    return true;
+  }
+
+  /** Loads the remaining pages (up to CAP) in the background; idempotent. */
+  function loadAll() {
+    if (bulk || !cursor || held >= CAP) return;
+    failed = false;
+    bulk = (async () => {
+      try {
+        while (cursor && held < CAP && !signal.aborted) {
+          await loadPage();
+          setCount();
+        }
+      } catch (e) {
+        failed = true;
+        console.error(e);
+      } finally {
+        bulk = null;
+        if (!signal.aborted) {
+          setCount();
+          announce(failed ? 'Could not load every tune' : `All ${held} tunes loaded`);
+        }
+      }
+    })();
+    setCount();
+  }
+
   const setCount = () => {
-    let s = list.total != null ? `${shown} of ${list.total} tunes` : `${shown} tunes`;
-    const active = table?.sort();
-    if (active) {
-      s += ` · sorted by ${SORT_NAMES[active.key]} ${active.dir === 'asc' ? '▲' : '▼'}`;
-      // Client-side sort covers loaded rows only; say so while more pages exist.
-      if (cursor) s += ' (loaded rows only — Load more adds and re-sorts)';
-    }
-    count.textContent = s;
-    more.hidden = !cursor;
+    const t = total();
+    const { shown } = table.counts();
+    const q = filter.value.trim();
+    const parts: string[] = [];
+    parts.push(q ? `${shown} of ${t ?? held} tunes match “${q}”` : t != null ? `${held} of ${t} tunes` : `${held} tunes`);
+    const active = table.sort();
+    if (active) parts.push(`sorted by ${SORT_NAMES[active.key]} ${active.dir === 'asc' ? '▲' : '▼'}`);
+    if (bulk) parts.push(`loading all tunes… ${held}${t != null ? `/${Math.min(t, CAP)}` : ''}`);
+    else if (failed) parts.push('could not load every tune — try again');
+    else if (cursor && held >= CAP) parts.push(`showing the first ${CAP.toLocaleString('en')}`);
+    count.textContent = parts.join(' · ');
+    // "Load more" is only for plain browsing; sorting / filtering loads everything.
+    more.hidden = !cursor || held >= CAP || !!bulk || !!active || !!q;
   };
+
   const table: TuneTable = tuneTable(list.tunes, {
     hideRiddim: kind === 'riddim' && !route.versions,
     hideLabel: kind === 'label',
-    onSort: () => setCount(),
+    onSort: () => {
+      loadAll();
+      setCount();
+    },
   });
+
+  let urlTimer = 0;
+  const applyFilter = () => {
+    table.setFilter(filter.value);
+    if (filter.value.trim()) loadAll();
+    setCount();
+    clearTimeout(urlTimer);
+    urlTimer = window.setTimeout(() => {
+      // Keep the filter in the URL (shareable) without re-rendering the page.
+      history.replaceState(null, '', withQuery(location.pathname, { f: filter.value.trim() || null, versions: route.versions ? '1' : null }));
+    }, 300);
+  };
+  filter.addEventListener('input', applyFilter);
+  filter.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && filter.value) {
+      e.preventDefault();
+      e.stopPropagation();
+      filter.value = '';
+      applyFilter();
+    }
+  });
+  if (route.f) applyFilter();
   setCount();
+
   more.addEventListener('click', async () => {
-    if (!cursor) return;
     more.disabled = true;
     more.textContent = 'Loading…';
     try {
-      const page = await api<TuneList>(base + '?' + new URLSearchParams({ ...params, cursor }));
-      table.add(page.tunes);
-      shown += page.tunes.length;
-      cursor = page.next_cursor;
-      announce(`${page.tunes.length} more tunes loaded`);
+      const n = held;
+      await loadPage();
+      announce(`${held - n} more tunes loaded`);
+      more.textContent = 'Load more';
     } catch (e) {
       announce('Could not load more');
       more.textContent = 'Failed — try again';
-      more.disabled = false;
       console.error(e);
-      return;
     }
     more.disabled = false;
-    more.textContent = 'Load more';
     setCount();
   });
 
-  main.replaceChildren(
-    head,
-    controls,
-    count,
-    list.tunes.length ? table.el : h('p', { class: 'state' }, route.f ? `No tunes match “${route.f}”.` : 'No tunes listed.'),
-    more,
-  );
+  main.replaceChildren(head, controls, count, list.tunes.length ? table.el : h('p', { class: 'state' }, 'No tunes listed.'), more);
   announce(`${name}: ${count.textContent}`);
 }
 
