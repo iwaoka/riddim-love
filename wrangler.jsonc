@@ -6,7 +6,10 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
+    // All app state lives in the query string on "/", so no SPA fallback:
+    // a missing /assets/* file must 404, never return index.html (which the
+    // immutable cache header would otherwise pin in browsers).
+    "not_found_handling": "404-page",
     "run_worker_first": ["/api/*"]
   },
   "routes": [{ "pattern": "riddim.love", "custom_domain": true }],

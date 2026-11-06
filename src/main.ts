@@ -1,5 +1,6 @@
 import './style.css';
-import { copyText, displayText, youtubeQuery, youtubeUrl, type YoutubeOptions } from '../shared/format';
+import { artistNames, copyText, displayText, searchText, youtubeQuery, youtubeUrl, type YoutubeOptions } from '../shared/format';
+import { sortByLabelArtistTitle } from '../shared/sort';
 import type { ApiError, ListKind, NameHit, Ref, Riddim, RiddimRef, SearchResult, Tune, TuneHit, TuneList } from '../shared/types';
 import { append, h, safeExternal } from './dom';
 
@@ -159,25 +160,55 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-function copyButton(text: string): HTMLButtonElement {
-  const btn = h('button', { type: 'button', class: 'act copy', title: `Copy “${text}”`, 'aria-label': `Copy ${text}` }, 'Copy');
+// Lucide icons (ISC licence, https://lucide.dev), inlined: no external requests.
+const ICONS = {
+  copy: ['M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2', 'rect:8,8,14,14,2'],
+  check: ['M20 6 9 17l-5-5'],
+  x: ['M18 6 6 18', 'm6 6 12 12'],
+} as const;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function icon(name: keyof typeof ICONS): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  for (const [k, v] of Object.entries({ viewBox: '0 0 24 24', width: '18', height: '18', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' })) {
+    svg.setAttribute(k, v);
+  }
+  for (const d of ICONS[name]) {
+    if (d.startsWith('rect:')) {
+      const [x, y, w, hh, r] = d.slice(5).split(',');
+      const rect = document.createElementNS(SVG_NS, 'rect');
+      for (const [k, v] of Object.entries({ x, y, width: w, height: hh, rx: r, ry: r })) rect.setAttribute(k, v);
+      svg.appendChild(rect);
+    } else {
+      const p = document.createElementNS(SVG_NS, 'path');
+      p.setAttribute('d', d);
+      svg.appendChild(p);
+    }
+  }
+  return svg;
+}
+
+function copyButton(text: string, cls = ''): HTMLButtonElement {
+  const label = `Copy “${text}”`;
+  const btn = h('button', { type: 'button', class: ('copy ' + cls).trim(), title: label, 'aria-label': label }, icon('copy'));
   let timer = 0;
   btn.addEventListener('click', async () => {
     const ok = await copyToClipboard(text);
-    btn.textContent = ok ? 'Copied' : 'Failed';
+    btn.replaceChildren(icon(ok ? 'check' : 'x'));
     btn.classList.toggle('done', ok);
+    btn.classList.toggle('fail', !ok);
     announce(ok ? `Copied: ${text}` : 'Copy failed');
     clearTimeout(timer);
     timer = window.setTimeout(() => {
-      btn.textContent = 'Copy';
-      btn.classList.remove('done');
-    }, 1400);
+      btn.replaceChildren(icon('copy'));
+      btn.classList.remove('done', 'fail');
+    }, 1200);
   });
   return btn;
 }
 
 function youtubeButton(row: Row): HTMLButtonElement {
-  const btn = h('button', { type: 'button', class: 'act yt', 'aria-label': `Search YouTube for ${copyText(row.artists, row.title)}` }, 'YouTube');
+  const btn = h('button', { type: 'button', class: 'act yt', 'aria-label': `Search YouTube for ${searchText(row.artists, row.title)}` }, 'YouTube');
   const update = () => (btn.title = 'YouTube: ' + youtubeQuery({ ...row, label: row.label ?? null }, yt));
   btn.addEventListener('mouseenter', update);
   btn.addEventListener('focus', update);
@@ -187,33 +218,22 @@ function youtubeButton(row: Row): HTMLButtonElement {
   return btn;
 }
 
-function tuneRow(row: Row, opts: { hideRiddim?: boolean; hideLabel?: boolean } = {}): HTMLLIElement {
-  const text = displayText(row.artists, row.title);
-  const meta: (Node | string)[] = [];
-  if (!opts.hideRiddim) {
-    meta.push(
-      h('span', { class: 'c-riddim' },
-        row.riddim ? link(listHref('riddim', row.riddim.id), row.riddim.name) : h('span', { class: 'muted' }, '—'),
-      ),
-    );
-  }
-  if (!opts.hideLabel) {
-    meta.push(
-      h('span', { class: 'c-label' },
-        row.label ? link(listHref('label', row.label.id), row.label.name) : h('span', { class: 'muted' }, row.label === undefined ? '' : '—'),
-      ),
-    );
-  }
-  meta.push(h('span', { class: 'c-year' }, row.year ? String(row.year) : ''));
+type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean };
 
-  return h('li', { class: 'row' + (row.is_original ? ' orig' : '') },
-    h('span', { class: 'c-main' },
-      h('span', { class: 'at' }, text),
+function tuneRow(row: Row, opts: TableOpts = {}): HTMLTableRowElement {
+  const text = displayText(row.artists, row.title);
+  const dash = () => h('span', { class: 'muted' }, '—');
+  return h('tr', { class: row.is_original ? 'orig' : null },
+    h('td', { class: 'c-copy' }, copyButton(copyText(row.artists, row.title))),
+    h('td', { class: 'c-artist' }, row.artists.length ? artistNames(row.artists) : dash()),
+    h('td', { class: 'c-title' },
+      row.title,
       row.is_original ? h('span', { class: 'badge', title: 'The original tune this riddim is named after' }, 'Original') : null,
     ),
-    ...meta,
-    h('span', { class: 'c-act' },
-      copyButton(copyText(row.artists, row.title)),
+    opts.hideRiddim ? null : h('td', { class: 'c-riddim' }, row.riddim ? link(listHref('riddim', row.riddim.id), row.riddim.name) : dash()),
+    opts.hideLabel ? null : h('td', { class: 'c-label' }, row.label ? link(listHref('label', row.label.id), row.label.name) : dash()),
+    h('td', { class: 'c-year' }, row.year ? String(row.year) : ''),
+    h('td', { class: 'c-act' },
       youtubeButton(row),
       h('a', { href: qs({ tune: row.id }), class: 'act info', 'aria-label': `Details for ${text}`, title: 'Details',
         onclick: ((e: MouseEvent) => {
@@ -225,12 +245,23 @@ function tuneRow(row: Row, opts: { hideRiddim?: boolean; hideLabel?: boolean } =
   );
 }
 
-function tuneTable(rows: Row[], opts: { hideRiddim?: boolean; hideLabel?: boolean } = {}): HTMLElement {
-  const cols = ['Artist – Title', !opts.hideRiddim && 'Riddim', !opts.hideLabel && 'Label', 'Year', ''].filter((c) => c !== false);
-  const cls = 'tunes' + (opts.hideRiddim ? ' no-riddim' : '') + (opts.hideLabel ? ' no-label' : '');
-  return h('div', { class: cls },
-    h('div', { class: 'thead', 'aria-hidden': 'true' }, ...cols.map((c) => h('span', {}, c as string))),
-    h('ul', { class: 'rows' }, ...rows.map((r) => tuneRow(r, opts))),
+function tuneTable(rows: Row[], opts: TableOpts = {}): HTMLElement {
+  const head = (cls: string, text: string, sr = false) => h('th', { scope: 'col', class: cls }, sr ? h('span', { class: 'sr-only' }, text) : text);
+  return h('div', { class: 'tunes-wrap' },
+    h('table', { class: 'tunes' },
+      h('thead', {},
+        h('tr', {},
+          head('c-copy', 'Copy', true),
+          head('c-artist', 'Artist'),
+          head('c-title', 'Title'),
+          opts.hideRiddim ? null : head('c-riddim', 'Riddim'),
+          opts.hideLabel ? null : head('c-label', 'Label'),
+          head('c-year', 'Year'),
+          head('c-act', 'Actions', true),
+        ),
+      ),
+      h('tbody', {}, ...rows.map((r) => tuneRow(r, opts))),
+    ),
   );
 }
 
@@ -322,10 +353,11 @@ async function renderSearch(q: string, signal: AbortSignal) {
           res.tunes.length >= res.limit
             ? `Top ${res.limit} title matches (search is capped at ${res.limit}). Open a riddim, artist or label above for its full list.`
             : `${res.tunes.length} title match${res.tunes.length === 1 ? '' : 'es'}.`,
+          ' Sorted by label → artist → title (search hits carry no label, so effectively artist → title).',
         ),
       ),
       res.tunes.length
-        ? tuneTable(res.tunes.map((t: TuneHit) => ({ ...t, label: undefined })), { hideLabel: true })
+        ? tuneTable(sortByLabelArtistTitle(res.tunes.map((t: TuneHit) => ({ ...t, label: null }))), { hideLabel: true })
         : h('p', { class: 'muted' }, 'No tune titles matched. Try a name above.'),
     ),
   );
@@ -416,7 +448,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
 
   const count = h('p', { class: 'count muted' });
   const table = tuneTable(list.tunes, { hideRiddim: kind === 'riddim' && !route.versions, hideLabel: kind === 'label' });
-  const ul = table.querySelector('ul') as HTMLUListElement;
+  const ul = table.querySelector('tbody') as HTMLTableSectionElement;
   const more = h('button', { type: 'button', class: 'more' }, 'Load more');
   let shown = list.tunes.length;
   let cursor = list.next_cursor;
@@ -485,7 +517,7 @@ async function renderTune(id: number, signal: AbortSignal) {
       h('p', { class: 'kind' }, 'Tune'),
       h('h1', { class: 'at' }, text),
       h('dl', {}, ...rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, ...v)])),
-      h('p', { class: 'c-act' }, copyButton(copyText(t.artists, t.title)), youtubeButton(t)),
+      h('p', { class: 'c-act' }, copyButton(copyText(t.artists, t.title), 'act-copy'), youtubeButton(t)),
       h('p', { class: 'muted' },
         'Source: ',
         external(t.riddim?.url ?? null, `${t.riddim?.name ?? 'Riddim'} on Riddim-ID ↗`) ?? external('https://riddim-id.com/', 'Riddim-ID ↗'),

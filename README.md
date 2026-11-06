@@ -11,8 +11,9 @@ Data provided by [Riddim-ID](https://riddim-id.com/) via its public API v1. RIDD
 ## Features
 
 - One search box for artist, tune title, riddim and label (typo tolerant, via Riddim-ID `/search`)
-- Compact tune lists: **Artist – Title** as one copyable string, plus Riddim, Label, Year
-- Copy button (`Artist Title`) and YouTube search button (optionally `+ Riddim`, `+ Label`)
+- Compact tune table: copy icon first, then Artist, Title, Riddim, Label, Year
+- One-click copy as `Artist - Title`; YouTube search button (`Artist Title`, optionally `+ Riddim`, `+ Label`)
+- Search results sorted client-side by Label → Artist → Title (`Intl.Collator`, case-insensitive, stable, blank labels last). Note: search hits carry no label, so in practice this is Artist → Title
 - Full tune lists per riddim / artist / producer / label with "Load more" (cursor pagination)
 - Riddim filter (title or artist), sort, and "include versions"
 - Shareable URLs (`/?q=`, `/?riddim=18`, `/?artist=263`, `/?label=61`, `/?tune=759`)
@@ -39,6 +40,8 @@ Data provided by [Riddim-ID](https://riddim-id.com/) via its public API v1. RIDD
 - Edge cache via the Cache API, TTL taken from upstream `Cache-Control` (`s-maxage`, default 300 s)
 - Upstream `429` → local cool-down honouring `Retry-After`
 - No bulk fetching or storage of the dataset
+
+Icons: [Lucide](https://lucide.dev) (ISC), inlined as SVG.
 
 ## Development
 

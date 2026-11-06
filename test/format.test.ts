@@ -5,11 +5,12 @@ const ws = [{ id: 263, name: 'Wayne Smith', url: null }];
 const t = { artists: ws, title: 'Under Mi Sleng Teng', riddim: { id: 18, name: 'Sleng Teng', url: null }, label: { id: 61, name: "Jammy's", url: null } };
 
 describe('format', () => {
-  it('copy text is "Artist Title"', () => {
-    expect(copyText(ws, 'Under Mi Sleng Teng')).toBe('Wayne Smith Under Mi Sleng Teng');
+  it('copy text is "Artist - Title"', () => {
+    expect(copyText(ws, 'Under Mi Sleng Teng')).toBe('Wayne Smith - Under Mi Sleng Teng');
+    expect(copyText([], 'Dub')).toBe('Dub');
   });
   it('joins several artists with &', () => {
-    expect(copyText([...ws, { id: 1, name: 'Tenor Saw', url: null }], 'X')).toBe('Wayne Smith & Tenor Saw X');
+    expect(copyText([...ws, { id: 1, name: 'Tenor Saw', url: null }], 'X')).toBe('Wayne Smith & Tenor Saw - X');
   });
   it('display text is one string "Artist – Title"', () => {
     expect(displayText(ws, 'Under Mi Sleng Teng')).toBe('Wayne Smith – Under Mi Sleng Teng');
