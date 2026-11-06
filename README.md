@@ -12,8 +12,9 @@ Data provided by [Riddim-ID](https://riddim-id.com/) via its public API v1. RIDD
 
 - Targeted search: pick **Riddim** (default), **Tune** (titles only), **Artist** or **Label**; one upstream `/search?types=<target>` request, nothing else shown. Typo tolerant
 - The chosen target is kept in the URL (`/?type=tune&q=pumpkin+belly`) and remembered for next time
-- Compact tune table: Artist, Title, Riddim, Label, Year, then row actions on the right: **YouTube → Discogs → Info → Copy**
-- YouTube and Discogs open a search-results page for `Artist Title` (shared builder in `shared/format.ts`, `EXTERNAL_SEARCHES`; no API calls). Copy puts `Artist - Title` on the clipboard
+- Compact tune table: Artist, Title, Riddim, Label, Year, then row actions: **YouTube / Info / Copy / Dig**
+- YouTube: search results for `Artist Title` (new tab). Info: the tune page. Copy: `Artist - Title` to the clipboard.
+- Dig: a small menu (one shared popover, fixed position, keyboard + Escape/outside-click to close) with Discogs, Mercari and Yahoo! Auctions searches for `Artist Title`. Plain search URLs built in the browser (`EXTERNAL_SEARCHES` / `DIG_SEARCHES` in `shared/format.ts`) — no API calls, no affiliate parameters
 - Click a column header (Artist, Title, Riddim, Label, Year) to sort; click again to reverse. Client-side over the rows on screen (`Intl.Collator`, case-insensitive, blanks last, ties → Label → Artist → Title, stable). No extra requests: on paged lists only loaded rows are sorted, and the page says so. Tune search defaults to Artist → Title (search hits carry no label)
 - Full tune lists per riddim / artist / producer / label with "Load more" (cursor pagination)
 - Riddim filter (title or artist), sort, and "include versions"

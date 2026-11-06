@@ -1,5 +1,5 @@
 import './style.css';
-import { copyText, displayText, EXTERNAL_SEARCHES, externalSearchUrl, searchText, type ExternalSearch } from '../shared/format';
+import { copyText, DIG_SEARCHES, displayText, externalSearchUrl, searchText } from '../shared/format';
 import { labelMeta, ORIGIN, parsePagePath, personMeta, refPath, riddimMeta, tuneMeta, tunePath, type PageMeta } from '../shared/seo';
 import { sortRows, type SortDir, type SortKey } from '../shared/sort';
 
@@ -270,44 +270,42 @@ function icon(name: keyof typeof ICONS, size = 18): SVGSVGElement {
   return svg;
 }
 
-/** Copy "Artist - Title" (local only, no request); brief check-mark feedback. */
+/** Short visible label; hidden on narrow screens (icon only), always in the accessible name. */
+const actLabel = (text: string, always = false) => h('span', { class: always ? 'act-text' : 'act-text act-text-wide' }, text);
+
+/** Copy "Artist - Title" (local only, no request); brief check-mark feedback. Width never changes. */
 function copyButton(text: string): HTMLButtonElement {
   const label = `Copy “${text}”`;
-  const btn = h('button', { type: 'button', class: 'act act-icon copy act-copy', title: label, 'aria-label': label }, icon('copy', 16));
+  const ico = h('span', { class: 'act-ico' }, icon('copy', 16));
+  const btn = h('button', { type: 'button', class: 'act act-copy', title: label, 'aria-label': label }, ico, actLabel('Copy'));
   let timer = 0;
   btn.addEventListener('click', async () => {
     const ok = await copyToClipboard(text);
-    btn.replaceChildren(icon(ok ? 'check' : 'x', 16));
+    ico.replaceChildren(icon(ok ? 'check' : 'x', 16));
     btn.classList.toggle('done', ok);
     btn.classList.toggle('fail', !ok);
     announce(ok ? `Copied: ${text}` : 'Copy failed');
     clearTimeout(timer);
     timer = window.setTimeout(() => {
-      btn.replaceChildren(icon('copy', 16));
+      ico.replaceChildren(icon('copy', 16));
       btn.classList.remove('done', 'fail');
     }, 1200);
   });
   return btn;
 }
 
-/** Link to an external search-results page (new tab), built from "Artist Title". */
-function externalButton(id: ExternalSearch['id'], row: Pick<Row, 'artists' | 'title'>): HTMLAnchorElement {
-  const service = EXTERNAL_SEARCHES.find((s) => s.id === id)!;
+/** YouTube search results for "Artist Title" (new tab). */
+function youtubeButton(row: Pick<Row, 'artists' | 'title'>): HTMLAnchorElement {
   const query = searchText(row.artists, row.title);
-  const label = `Search ${service.name} for “${query}” (opens in a new tab)`;
-  const isYt = id === 'youtube';
+  const label = `Search YouTube for “${query}” (opens in a new tab)`;
   return h('a', {
-    href: externalSearchUrl(id, row.artists, row.title),
+    href: externalSearchUrl('youtube', row.artists, row.title),
     target: '_blank',
     rel: 'noopener noreferrer',
-    class: isYt ? 'act act-yt' : 'act act-icon act-ext act-discogs',
+    class: 'act act-yt',
     title: label,
     'aria-label': label,
-  },
-    icon(isYt ? 'play' : 'disc', isYt ? 13 : 16),
-    // YouTube keeps its name visible; Discogs shows its name only where there is room.
-    h('span', { class: isYt ? 'act-text' : 'act-text act-text-wide' }, service.name),
-  );
+  }, icon('play', 13), actLabel('YouTube', true));
 }
 
 function infoButton(row: Row): HTMLAnchorElement {
@@ -315,7 +313,7 @@ function infoButton(row: Row): HTMLAnchorElement {
   const label = `Details for ${displayText(row.artists, row.title)}`;
   return h('a', {
     href,
-    class: 'act act-icon act-info',
+    class: 'act act-info',
     title: label,
     'aria-label': label,
     onclick: ((e: MouseEvent) => {
@@ -323,17 +321,133 @@ function infoButton(row: Row): HTMLAnchorElement {
       e.preventDefault();
       navigate(href);
     }) as EventListener,
-  }, icon('info', 16));
+  }, icon('info', 16), actLabel('Info'));
 }
 
-/** Row actions, in priority order: YouTube → Discogs → Info → Copy. */
+// ---------- Dig: one shared popover menu for every row ----------
+// Built lazily, positioned with fixed coordinates (no layout shift), filled
+// only when opened; links are plain search URLs made in the browser.
+let digMenu: HTMLDivElement | null = null;
+let digOwner: HTMLButtonElement | null = null;
+
+function positionDig() {
+  if (!digMenu || !digOwner) return;
+  const r = digOwner.getBoundingClientRect();
+  const m = digMenu.getBoundingClientRect();
+  const gap = 4;
+  const edge = 8;
+  let top = r.bottom + gap;
+  if (top + m.height > innerHeight - edge && r.top - gap - m.height >= edge) top = r.top - gap - m.height; // flip up
+  top = Math.max(edge, Math.min(top, innerHeight - m.height - edge));
+  let left = r.right - m.width; // align to the button's right edge
+  left = Math.max(edge, Math.min(left, innerWidth - m.width - edge));
+  digMenu.style.top = `${Math.round(top)}px`;
+  digMenu.style.left = `${Math.round(left)}px`;
+}
+
+function closeDig(returnFocus = false) {
+  if (!digMenu || !digOwner) return;
+  const owner = digOwner;
+  digOwner = null;
+  digMenu.hidden = true;
+  digMenu.replaceChildren();
+  owner.setAttribute('aria-expanded', 'false');
+  owner.classList.remove('open');
+  if (returnFocus) owner.focus();
+}
+
+function ensureDigMenu(): HTMLDivElement {
+  if (digMenu) return digMenu;
+  const menu = h('div', { id: 'dig-menu', class: 'dig-menu', role: 'menu', 'aria-label': 'Dig for records', hidden: true });
+  menu.addEventListener('keydown', (e) => {
+    const items = [...menu.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]')];
+    const i = items.indexOf(document.activeElement as HTMLAnchorElement);
+    const go = (n: number) => {
+      e.preventDefault();
+      items[(n + items.length) % items.length]?.focus();
+    };
+    if (e.key === 'ArrowDown') go(i + 1);
+    else if (e.key === 'ArrowUp') go(i - 1);
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(items.length - 1);
+    else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeDig(true);
+    } else if (e.key === 'Tab') closeDig(false);
+  });
+  menu.addEventListener('click', (e) => {
+    if ((e.target as Element).closest('a')) closeDig(false); // the link itself opens in a new tab
+  });
+  document.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (digOwner && !menu.contains(e.target as Node) && !digOwner.contains(e.target as Node)) closeDig(false);
+    },
+    true,
+  );
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && digOwner) closeDig(true);
+  });
+  window.addEventListener('resize', () => closeDig(false));
+  window.addEventListener('scroll', positionDig, { passive: true, capture: true });
+  document.body.appendChild(menu);
+  digMenu = menu;
+  return menu;
+}
+
+function openDig(btn: HTMLButtonElement, row: Pick<Row, 'artists' | 'title'>, focusFirst: boolean) {
+  closeDig(false);
+  const menu = ensureDigMenu();
+  const query = searchText(row.artists, row.title);
+  menu.replaceChildren(
+    h('p', { class: 'dig-head', 'aria-hidden': 'true' }, query),
+    ...DIG_SEARCHES.map((s) =>
+      h('a', {
+        role: 'menuitem',
+        href: s.url(query),
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        title: `Search ${s.name} for “${query}” (opens in a new tab)`,
+      }, h('span', { class: 'dig-name' }, s.name), h('span', { class: 'dig-host', 'aria-hidden': 'true' }, new URL(s.url('')).hostname.replace(/^www\./, ''))),
+    ),
+  );
+  menu.hidden = false;
+  digOwner = btn;
+  btn.setAttribute('aria-expanded', 'true');
+  btn.classList.add('open');
+  positionDig();
+  if (focusFirst) menu.querySelector<HTMLAnchorElement>('[role="menuitem"]')?.focus();
+}
+
+function digButton(row: Pick<Row, 'artists' | 'title'>): HTMLButtonElement {
+  const query = searchText(row.artists, row.title);
+  const label = `Dig: search record shops for “${query}”`;
+  const btn = h('button', {
+    type: 'button',
+    class: 'act act-dig',
+    title: label,
+    'aria-label': label,
+    'aria-haspopup': 'menu',
+    'aria-expanded': 'false',
+    'aria-controls': 'dig-menu',
+  }, icon('disc', 16), actLabel('Dig'));
+  btn.addEventListener('click', (e) => {
+    if (digOwner === btn) closeDig(false);
+    else openDig(btn, row, e.detail === 0); // detail 0 = keyboard (Enter/Space): move focus into the menu
+  });
+  btn.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      openDig(btn, row, true);
+    }
+  });
+  return btn;
+}
+
+/** Row actions, in priority order: YouTube → Info → Copy → Dig. */
 function rowActions(row: Row, { info = true } = {}): (HTMLElement | null)[] {
-  return [
-    externalButton('youtube', row),
-    externalButton('discogs', row),
-    info ? infoButton(row) : null,
-    copyButton(copyText(row.artists, row.title)),
-  ];
+  return [youtubeButton(row), info ? infoButton(row) : null, copyButton(copyText(row.artists, row.title)), digButton(row)];
 }
 
 type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean };
@@ -377,6 +491,7 @@ function tuneTable(
   const ths = new Map<SortKey, HTMLTableCellElement>();
 
   const paint = () => {
+    closeDig(false); // rows are about to be replaced
     const ordered = sort ? sortRows(all, sort.key, sort.dir) : all;
     tbody.replaceChildren(...ordered.map((r) => tuneRow(r, opts)));
     for (const [key, th] of ths) {
@@ -742,6 +857,7 @@ function trackPageView(signal: AbortSignal) {
 }
 
 async function render() {
+  closeDig(false);
   navController?.abort();
   const ctrl = new AbortController();
   navController = ctrl;

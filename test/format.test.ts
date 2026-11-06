@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { copyText, displayText, EXTERNAL_SEARCHES, externalSearchUrl, searchText, youtubeUrl } from '../shared/format';
+import { copyText, DIG_SEARCHES, displayText, EXTERNAL_SEARCHES, externalSearchUrl, searchText, youtubeUrl } from '../shared/format';
 
 const ws = [{ id: 263, name: 'Wayne Smith', url: null }];
 
@@ -31,7 +31,12 @@ describe('format', () => {
     const a = [{ id: 1, name: 'Bounty Killer & Wayne Smith', url: null }];
     expect(externalSearchUrl('discogs', a, 'Sleng Teng #1 / Ting?')).toBe('https://www.discogs.com/search/?q=Bounty%20Killer%20%26%20Wayne%20Smith%20Sleng%20Teng%20%231%20%2F%20Ting%3F');
   });
-  it('services are listed in button order', () => {
-    expect(EXTERNAL_SEARCHES.map((s) => s.id)).toEqual(['youtube', 'discogs']);
+  it('dig menu: Discogs, Mercari, Yahoo! Auctions with the shared "Artist Title" words', () => {
+    expect(DIG_SEARCHES.map((s) => s.id)).toEqual(['discogs', 'mercari', 'yahoo']);
+    expect(externalSearchUrl('mercari', ws, 'Under Mi Sleng Teng')).toBe('https://jp.mercari.com/search?keyword=Wayne%20Smith%20Under%20Mi%20Sleng%20Teng');
+    expect(externalSearchUrl('yahoo', ws, 'Under Mi Sleng Teng')).toBe('https://auctions.yahoo.co.jp/search/search?p=Wayne%20Smith%20Under%20Mi%20Sleng%20Teng');
+  });
+  it('no affiliate or tracking parameters: each URL has exactly one query parameter', () => {
+    for (const s of EXTERNAL_SEARCHES) expect([...new URL(s.url('x')).searchParams.keys()]).toHaveLength(1);
   });
 });

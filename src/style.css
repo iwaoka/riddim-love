@@ -251,11 +251,16 @@ p.state[role="status"] { flex-direction: row; align-items: center; gap: 8px; }
 .act:hover, a.act:hover { color: var(--fg); background: var(--surface); border-color: var(--line-strong); }
 .act:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .act svg { flex: none; }
-.act-icon { width: 30px; padding: 0; }
 /* Discogs shows its name when there is room */
-.act-ext.act-icon { width: auto; padding: 0 7px; }
+.act-ico { display: inline-flex; }
+/* Info / Copy / Dig: icon-only squares until there is room for their labels */
 .act-text-wide { display: none; }
-@media (min-width: 1100px) { .act-text-wide { display: inline; } }
+.act:not(.act-yt) { width: 30px; padding: 0; }
+@media (min-width: 1100px) {
+  .act-text-wide { display: inline; }
+  .act:not(.act-yt) { width: auto; padding: 0 9px 0 8px; }
+  .act.act-copy { min-width: 70px; } /* label stays "Copy" while the icon flips to ✓, so width never changes */
+}
 /* YouTube icon is a filled play triangle */
 .act-yt svg { fill: currentColor; }
 
@@ -294,8 +299,7 @@ p.state[role="status"] { flex-direction: row; align-items: center; gap: 8px; }
 .tune dt { color: var(--fg-2); padding-right: 24px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; align-self: stretch; display: flex; align-items: center; }
 .acts-lg { display: flex; justify-content: flex-start; gap: 6px; margin: 0 0 12px; }
 .acts-lg .act { height: 38px; min-width: 38px; font-size: 14px; border-color: var(--line-strong); background: var(--surface-2); }
-.acts-lg .act-icon { width: 38px; }
-.acts-lg .act-ext.act-icon { width: auto; padding: 0 12px; }
+.acts-lg .act:not(.act-yt) { width: auto; padding: 0 12px 0 10px; }
 .acts-lg .act-text-wide { display: inline; }
 .tune > p.muted:last-child { margin: 0; padding-top: 12px; border-top: 1px dashed var(--line); font-size: 13px; }
 
@@ -384,16 +388,19 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
   }
 }
 .act.act-yt      { --c: var(--btn-yt);      --c-h: var(--btn-yt-hover);      --e: var(--btn-yt); }
-.act.act-discogs { --c: var(--btn-discogs); --c-h: var(--btn-discogs-hover); --e: var(--btn-discogs-edge); }
+.act.act-dig     { --c: var(--btn-discogs); --c-h: var(--btn-discogs-hover); --e: var(--btn-discogs-edge); }
 .act.act-info    { --c: var(--btn-info);    --c-h: var(--btn-info-hover);    --e: var(--btn-info); }
 .act.act-copy    { --c: var(--btn-copy);    --c-h: var(--btn-copy-hover);    --e: var(--btn-copy); }
-.act.act-yt, .act.act-discogs, .act.act-info, .act.act-copy {
+.act.act-yt, .act.act-dig, .act.act-info, .act.act-copy {
   color: #fff; background: var(--c); border-color: var(--e);
 }
-.act.act-yt:hover, .act.act-discogs:hover, .act.act-info:hover, .act.act-copy:hover {
+.act.act-yt:hover, .act.act-dig:hover, .act.act-info:hover, .act.act-copy:hover,
+.act.act-dig.open {
   color: #fff; background: var(--c-h); border-color: var(--c-h);
 }
-.act.act-discogs:hover { border-color: var(--e); }
+.act.act-dig:hover, .act.act-dig.open { border-color: var(--e); }
+.act.act-dig.open { box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 35%, transparent); }
+.act.act-yt:focus-visible, .act.act-dig:focus-visible, .act.act-info:focus-visible, .act.act-copy:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* copy feedback */
 .act.act-copy.done { background: #3f8a5c; border-color: #3f8a5c; color: #fff; }
 .act.act-copy.fail { background: #a3453f; border-color: #a3453f; color: #fff; }
@@ -414,3 +421,24 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 .consent-actions { display: flex; gap: 8px; margin-left: auto; }
 .consent button { padding: 6px 14px; font-weight: 600; }
 .consent .consent-accept { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+
+/* ---------- Dig menu (shared popover; fixed position, so rows never move) ---------- */
+.dig-menu {
+  position: fixed; z-index: 30; top: 0; left: 0;
+  min-width: 220px; max-width: min(300px, calc(100vw - 16px));
+  padding: 4px;
+  background: var(--surface); color: var(--fg);
+  border: 1px solid var(--line-strong); border-radius: var(--radius);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.16);
+}
+.dig-menu[hidden] { display: none; }
+.dig-head { margin: 2px 8px 4px; font-size: 11.5px; color: var(--fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dig-menu a {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 9px 10px; border-radius: var(--radius-sm);
+  color: var(--fg); text-decoration: none; font-size: 14px; font-weight: 600;
+}
+.dig-menu a:hover, .dig-menu a:focus-visible { background: var(--row-hover); outline: none; }
+.dig-menu a:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); }
+.dig-host { font-size: 12px; font-weight: 400; color: var(--fg-3); }
+@media (max-width: 720px) { .dig-menu a { padding: 12px 12px; } } /* larger touch targets */
