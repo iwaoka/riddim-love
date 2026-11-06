@@ -11,6 +11,7 @@ import {
   parseId,
   parseQuery,
   RIDDIM_TUNE_SORTS,
+  SEARCH_TYPES,
   TUNE_SORTS,
 } from './validate';
 
@@ -22,8 +23,7 @@ const UPSTREAM = 'https://api.riddim-id.com/v1';
 const USER_AGENT = 'RIDDIM.LOVE/0.1 (+https://riddim.love; independent non-commercial search frontend)';
 const UPSTREAM_TIMEOUT_MS = 10_000;
 const DEFAULT_TTL = 300;
-const NAME_LIMIT = 20;
-const TUNE_LIMIT = 50;
+const SEARCH_LIMIT = 50; // upstream maximum
 
 /** Set when upstream answers 429; requests are refused locally until then. */
 let cooldownUntil = 0;
@@ -137,18 +137,19 @@ async function handleApi(url: URL, ctx: ExecutionContext): Promise<Response> {
   let m: RegExpExecArray | null;
 
   if (path === '/api/search') {
-    onlyParams(p, ['q']);
+    onlyParams(p, ['q', 'type']);
     const q = parseQuery(p.get('q'));
-    const [names, tunes] = await Promise.all([
-      upstream('/search', { q, types: 'riddim,artist,producer,label', limit: NAME_LIMIT }, ctx),
-      upstream('/search', { q, types: 'tune', limit: TUNE_LIMIT }, ctx),
-    ]);
-    const asArray = (b: unknown) => (Array.isArray(data(b)) ? (data(b) as unknown[]) : []);
+    const type = parseEnum(p.get('type'), SEARCH_TYPES) ?? 'riddim';
+    // One upstream request, restricted to the selected type.
+    const body = await upstream('/search', { q, types: type, limit: SEARCH_LIMIT }, ctx);
+    const hits = Array.isArray(data(body)) ? (data(body) as unknown[]) : [];
     const result: SearchResult = {
       query: q,
-      names: asArray(names).map(P.nameHit).filter((x) => x !== null),
-      tunes: asArray(tunes).map(P.tuneHit).filter((x) => x !== null),
-      limit: TUNE_LIMIT,
+      type,
+      // Filter again by type, so nothing outside the selection can leak through.
+      names: type === 'tune' ? [] : hits.map(P.nameHit).filter((x) => x !== null && x.type === type) as SearchResult['names'],
+      tunes: type === 'tune' ? (hits.map(P.tuneHit).filter((x) => x !== null) as SearchResult['tunes']) : [],
+      limit: SEARCH_LIMIT,
     };
     return json(result);
   }

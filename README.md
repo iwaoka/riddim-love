@@ -10,13 +10,14 @@ Data provided by [Riddim-ID](https://riddim-id.com/) via its public API v1. RIDD
 
 ## Features
 
-- One search box for artist, tune title, riddim and label (typo tolerant, via Riddim-ID `/search`)
+- Targeted search: pick **Riddim** (default), **Tune** (titles only), **Artist** or **Label**; one upstream `/search?types=<target>` request, nothing else shown. Typo tolerant
+- The chosen target is kept in the URL (`/?type=tune&q=pumpkin+belly`) and remembered for next time
 - Compact tune table: copy icon first, then Artist, Title, Riddim, Label, Year
 - One-click copy as `Artist - Title`; YouTube search button (`Artist Title`, optionally `+ Riddim`, `+ Label`)
-- Search results sorted client-side by Label → Artist → Title (`Intl.Collator`, case-insensitive, stable, blank labels last). Note: search hits carry no label, so in practice this is Artist → Title
+- Tune results sorted client-side by Label → Artist → Title (`Intl.Collator`, case-insensitive, stable, blank labels last). Search hits carry no label, so in practice this is Artist → Title
 - Full tune lists per riddim / artist / producer / label with "Load more" (cursor pagination)
 - Riddim filter (title or artist), sort, and "include versions"
-- Shareable URLs (`/?q=`, `/?riddim=18`, `/?artist=263`, `/?label=61`, `/?tune=759`)
+- Shareable URLs (`/?type=riddim&q=`, `/?riddim=18`, `/?artist=263`, `/?label=61`, `/?tune=759`)
 - Keyboard: `/` focuses search, `Enter` searches, `Esc` leaves the box
 
 ## Stack
@@ -29,7 +30,7 @@ Data provided by [Riddim-ID](https://riddim-id.com/) via its public API v1. RIDD
 
 | Route | Upstream |
 |---|---|
-| `GET /api/search?q=` | `/v1/search` ×2 (names: riddim, artist, producer, label – limit 20; tunes – limit 50) |
+| `GET /api/search?type=riddim|tune|artist|label&q=` | `/v1/search?types=<type>&limit=50` (one request) |
 | `GET /api/riddims/:id` | `/v1/riddims/:id` |
 | `GET /api/riddims/:id/tunes?cursor=&sort=&q=&versions=include` | `/v1/riddims/:id/tunes` |
 | `GET /api/{artists,producers,labels}/:id/tunes?cursor=&sort=` | same path upstream |

@@ -1,7 +1,7 @@
 import './style.css';
 import { artistNames, copyText, displayText, searchText, youtubeQuery, youtubeUrl, type YoutubeOptions } from '../shared/format';
 import { sortByLabelArtistTitle } from '../shared/sort';
-import type { ApiError, ListKind, NameHit, Ref, Riddim, RiddimRef, SearchResult, Tune, TuneHit, TuneList } from '../shared/types';
+import type { ApiError, ListKind, NameHit, Ref, Riddim, RiddimRef, SearchResult, SearchType, Tune, TuneHit, TuneList } from '../shared/types';
 import { append, h, safeExternal } from './dom';
 
 // ---------- elements ----------
@@ -76,8 +76,8 @@ async function api<T>(path: string, signal?: AbortSignal): Promise<T> {
 
 // ---------- routing ----------
 type Route =
-  | { view: 'home' }
-  | { view: 'search'; q: string }
+  | { view: 'home'; type: SearchType }
+  | { view: 'search'; q: string; type: SearchType }
   | { view: 'list'; kind: ListKind; id: number; f: string; sort: string; versions: boolean }
   | { view: 'tune'; id: number };
 
@@ -94,9 +94,50 @@ function parseRoute(search: string): Route {
       return { view: 'list', kind, id: Number(id), f: p.get('f') ?? '', sort: p.get('sort') ?? '', versions: p.get('versions') === '1' };
     }
   }
+  const raw = p.get('type');
+  const type: SearchType = isSearchType(raw) ? raw : storedType();
   const q = (p.get('q') ?? '').trim();
-  if (q) return { view: 'search', q };
-  return { view: 'home' };
+  if (q) return { view: 'search', q, type };
+  return { view: 'home', type };
+}
+
+// ---------- search target (Riddim / Tune / Artist / Label) ----------
+const SEARCH_TYPES: SearchType[] = ['riddim', 'tune', 'artist', 'label'];
+const TYPE_KEY = 'riddim.love:type';
+const isSearchType = (v: unknown): v is SearchType => SEARCH_TYPES.includes(v as SearchType);
+const typeRadios = [...document.querySelectorAll<HTMLInputElement>('#types input[name="type"]')];
+
+const TYPE_UI: Record<SearchType, { placeholder: string; label: string; plural: string }> = {
+  riddim: { placeholder: 'Riddim name, e.g. Sleng Teng', label: 'Search riddim names', plural: 'riddims' },
+  tune: { placeholder: 'Tune title, e.g. Pumpkin Belly', label: 'Search tune titles', plural: 'tunes' },
+  artist: { placeholder: 'Artist name, e.g. Tenor Saw', label: 'Search artist names', plural: 'artists' },
+  label: { placeholder: 'Label name, e.g. Jammys', label: 'Search label names', plural: 'labels' },
+};
+
+function storedType(): SearchType {
+  try {
+    const v = localStorage.getItem(TYPE_KEY);
+    return isSearchType(v) ? v : 'riddim';
+  } catch {
+    return 'riddim';
+  }
+}
+
+function currentType(): SearchType {
+  const v = typeRadios.find((r) => r.checked)?.value;
+  return isSearchType(v) ? v : 'riddim';
+}
+
+/** Reflects the search target in the tabs, placeholder and label, and remembers it. */
+function showType(type: SearchType) {
+  for (const r of typeRadios) r.checked = r.value === type;
+  input.placeholder = TYPE_UI[type].placeholder;
+  (document.getElementById('q-label') as HTMLElement).textContent = TYPE_UI[type].label;
+  try {
+    localStorage.setItem(TYPE_KEY, type);
+  } catch {
+    /* ignore */
+  }
 }
 
 function navigate(href: string, replace = false) {
@@ -291,78 +332,91 @@ function renderHome() {
   if (matchMedia('(pointer: fine)').matches) input.focus();
 }
 
-const GROUPS: { type: NameHit['type']; title: string }[] = [
-  { type: 'riddim', title: 'Riddims' },
-  { type: 'artist', title: 'Artists' },
-  { type: 'label', title: 'Labels' },
-  { type: 'producer', title: 'Producers' },
-];
+const NO_MATCH_TIP: Record<SearchType, string> = {
+  riddim: 'Try another spelling or fewer words. Riddim names often drop the word “Riddim”.',
+  tune: 'Tune search looks at titles only. To find an artist’s tunes, switch to Artist.',
+  artist: 'Try another spelling, or the artist’s best-known name.',
+  label: 'Try another spelling, or the label’s short name.',
+};
 
-async function renderSearch(q: string, signal: AbortSignal) {
-  document.title = `${q} — RIDDIM.LOVE`;
+function countNote(n: number, limit: number, noun: string, extra = ''): string {
+  return n >= limit
+    ? `Top ${limit} ${noun} (search returns at most ${limit}). Refine the search to narrow it down.${extra}`
+    : `${n} ${n === 1 ? noun.replace(/s$/, '') : noun}.${extra}`;
+}
+
+function namesTable(type: Exclude<SearchType, 'tune'>, hits: NameHit[]): HTMLElement {
+  const isRiddim = type === 'riddim';
+  return h('div', { class: 'tunes-wrap' },
+    h('table', { class: 'names-table' },
+      h('thead', {},
+        h('tr', {},
+          h('th', { scope: 'col' }, TYPE_UI[type].plural.replace(/^./, (c) => c.toUpperCase()).replace(/s$/, '')),
+          isRiddim ? h('th', { scope: 'col', class: 'c-year' }, 'Year') : null,
+          isRiddim ? h('th', { scope: 'col', class: 'c-note' }, 'Notes') : null,
+        ),
+      ),
+      h('tbody', {},
+        ...hits.map((n) =>
+          h('tr', {},
+            h('td', { class: 'c-name' }, link(listHref(type, n.id), n.name)),
+            isRiddim ? h('td', { class: 'c-year' }, n.year ? String(n.year) : '') : null,
+            isRiddim
+              ? h('td', { class: 'c-note muted' },
+                  [n.version_of ? `Version of ${n.version_of}` : '', n.matched_name && n.matched_name !== n.name ? `matched “${n.matched_name}”` : '']
+                    .filter(Boolean)
+                    .join(' · '),
+                )
+              : null,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+async function renderSearch(q: string, type: SearchType, signal: AbortSignal) {
+  document.title = `${q} (${type}) — RIDDIM.LOVE`;
   input.value = q;
   if (q.length < 2) {
     main.replaceChildren(h('p', { class: 'state' }, 'Type at least 2 characters.'));
     return;
   }
-  loading('Searching…');
-  const res = await api<SearchResult>('/api/search?' + new URLSearchParams({ q }), signal);
+  loading(type === 'tune' ? 'Searching tune titles…' : `Searching ${TYPE_UI[type].plural}…`);
+  const res = await api<SearchResult>('/api/search?' + new URLSearchParams({ type, q }), signal);
   if (signal.aborted) return;
 
-  const out: Node[] = [];
-  const total = res.names.length + res.tunes.length;
-  if (!total) {
+  const n = type === 'tune' ? res.tunes.length : res.names.length;
+  if (!n) {
     main.replaceChildren(
       h('div', { class: 'state' },
-        h('p', {}, `No matches for “${res.query}”.`),
-        h('p', { class: 'muted' }, 'Try fewer words, another spelling, or the riddim name alone.'),
+        h('p', {}, type === 'tune' ? `No tune titles match “${res.query}”.` : `No ${TYPE_UI[type].plural} match “${res.query}”.`),
+        h('p', { class: 'muted' }, NO_MATCH_TIP[type]),
       ),
     );
     announce('No matches');
     return;
   }
 
-  const groups = GROUPS.map((g) => ({ ...g, hits: res.names.filter((n) => n.type === g.type) })).filter((g) => g.hits.length);
-  if (groups.length) {
-    out.push(
-      h('section', { class: 'names', 'aria-label': 'Matching names' },
-        ...groups.map((g) =>
-          h('div', { class: 'group' },
-            h('h2', {}, g.title),
-            h('ul', { class: 'chips' },
-              ...g.hits.map((n) =>
-                h('li', {},
-                  link(listHref(n.type, n.id), n.name),
-                  n.year ? h('span', { class: 'muted' }, ` ${n.year}`) : null,
-                  n.version_of ? h('span', { class: 'muted' }, ` · version of ${n.version_of}`) : null,
-                  n.matched_name && n.matched_name !== n.name ? h('span', { class: 'muted' }, ` · aka ${n.matched_name}`) : null,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  let body: HTMLElement;
+  let note: string;
+  if (type === 'tune') {
+    note = countNote(n, res.limit, 'title matches', ' Searching tune titles only. Sorted by artist, then title.');
+    body = tuneTable(sortByLabelArtistTitle(res.tunes.map((t: TuneHit) => ({ ...t, label: null }))), { hideLabel: true });
+  } else {
+    note = countNote(n, res.limit, TYPE_UI[type].plural, ` Open one to see all its tunes.`);
+    body = namesTable(type, res.names.filter((x) => x.type === type));
   }
-
-  out.push(
-    h('section', { class: 'results', 'aria-label': 'Matching tunes' },
+  main.replaceChildren(
+    h('section', { class: 'results', 'aria-label': `${TYPE_UI[type].plural} matching ${res.query}` },
       h('div', { class: 'section-head' },
-        h('h2', {}, 'Tunes'),
-        h('p', { class: 'muted' },
-          res.tunes.length >= res.limit
-            ? `Top ${res.limit} title matches (search is capped at ${res.limit}). Open a riddim, artist or label above for its full list.`
-            : `${res.tunes.length} title match${res.tunes.length === 1 ? '' : 'es'}.`,
-          ' Sorted by label → artist → title (search hits carry no label, so effectively artist → title).',
-        ),
+        h('h2', {}, type === 'tune' ? 'Tunes · title search' : TYPE_UI[type].plural),
+        h('p', { class: 'muted' }, note),
       ),
-      res.tunes.length
-        ? tuneTable(sortByLabelArtistTitle(res.tunes.map((t: TuneHit) => ({ ...t, label: null }))), { hideLabel: true })
-        : h('p', { class: 'muted' }, 'No tune titles matched. Try a name above.'),
+      body,
     ),
   );
-  main.replaceChildren(...out);
-  announce(`${res.names.length} names and ${res.tunes.length} tunes found`);
+  announce(`${n} ${TYPE_UI[type].plural} found`);
 }
 
 const KIND_LABEL: Record<ListKind, string> = { riddim: 'Riddim', artist: 'Artist', producer: 'Producer', label: 'Label' };
@@ -533,9 +587,16 @@ async function render() {
   navController = ctrl;
   const route = parseRoute(location.search);
   document.body.classList.toggle('home', route.view === 'home');
+  if (route.view === 'home' || route.view === 'search') {
+    showType(route.type);
+    // Keep the URL canonical (e.g. a missing or unknown ?type=) so it can be shared as-is.
+    if (route.view === 'search' && new URLSearchParams(location.search).get('type') !== route.type) {
+      history.replaceState(null, '', qs({ type: route.type, q: route.q }));
+    }
+  }
   try {
     if (route.view === 'home') renderHome();
-    else if (route.view === 'search') await renderSearch(route.q, ctrl.signal);
+    else if (route.view === 'search') await renderSearch(route.q, route.type, ctrl.signal);
     else if (route.view === 'list') await renderList(route, ctrl.signal);
     else await renderTune(route.id, ctrl.signal);
   } catch (e) {
@@ -556,14 +617,30 @@ form.addEventListener('submit', (e) => {
     return;
   }
   input.setCustomValidity('');
-  navigate(qs({ q }));
+  navigate(qs({ type: currentType(), q }));
   input.blur();
 });
 input.addEventListener('input', () => input.setCustomValidity(''));
 
+// Switching the search target takes effect at once: re-run the current words
+// against the new target, or just update the URL/placeholder if there are none.
+for (const r of typeRadios) {
+  r.addEventListener('change', () => {
+    if (!r.checked) return;
+    const type = currentType();
+    showType(type);
+    const q = input.value.replace(/\s+/g, ' ').trim();
+    if (q.length >= 2) navigate(qs({ type, q }), true);
+    else if (parseRoute(location.search).view === 'home') history.replaceState(null, '', qs({ type }));
+    input.focus();
+  });
+}
+
 document.addEventListener('keydown', (e) => {
   const t = e.target as HTMLElement;
-  const typing = t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable;
+  const typing =
+    (t instanceof HTMLInputElement && !['radio', 'checkbox', 'button', 'submit'].includes(t.type)) ||
+    t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable;
   if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault();
     input.focus();
@@ -574,4 +651,5 @@ document.addEventListener('keydown', (e) => {
 });
 
 window.addEventListener('popstate', () => render());
+showType(storedType());
 render();

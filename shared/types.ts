@@ -46,11 +46,16 @@ export interface TuneHit {
   riddim: RiddimRef | null;
 }
 
+export type SearchType = 'riddim' | 'tune' | 'artist' | 'label';
+
 export interface SearchResult {
   query: string;
+  type: SearchType;
+  /** Riddim / artist / label hits (only of `type`). Empty for tune searches. */
   names: NameHit[];
+  /** Tune title hits. Empty unless `type` is "tune". */
   tunes: TuneHit[];
-  /** Max hits requested from upstream per group. */
+  /** Max hits requested from upstream (the API caps search at 50). */
   limit: number;
 }
 
