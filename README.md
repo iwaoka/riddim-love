@@ -32,7 +32,7 @@ Data provided by [Riddim-ID](https://riddim-id.com/) via its public API v1. RIDD
 - Vite + TypeScript, no framework, no third-party runtime JS
 - One Cloudflare Worker: serves the static build (Static Assets) and a whitelisted relay at `/api/*`
 - No database, no accounts
-- Analytics: Google Tag Manager `GTM-KCMD2C2M` (GA4 configured in GTM) via `public/analytics.js`, with Consent Mode v2: EU/EEA, UK and CH visitors see a consent banner and analytics cookies stay off until they accept (the Worker marks them with `<html data-consent="required">`); ad storage is always denied. In-app page changes push `rl_page_view` to the dataLayer. See `/privacy`
+- Analytics: Google Tag Manager `GTM-5BWJVSLC` (GA4 configured in GTM) via `public/analytics.js`, with Consent Mode v2: EU/EEA, UK and CH visitors see a consent banner and analytics cookies stay off until they accept (the Worker marks them with `<html data-consent="required">`); ad storage is always denied. In-app page changes push `rl_page_view` to the dataLayer. See `/privacy`
 
 ## API relay (`worker/`)
 

@@ -8,7 +8,7 @@
 // - Ads storage / personalisation: always denied (the site runs no ads).
 (function () {
   'use strict';
-  var GTM_ID = 'GTM-KCMD2C2M';
+  var GTM_ID = 'GTM-5BWJVSLC';
   var KEY = 'riddim.love:consent';
   var REGIONS = ['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'IS', 'LI', 'NO', 'GB', 'CH'];
 
