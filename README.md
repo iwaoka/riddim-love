@@ -12,7 +12,7 @@ Data provided by [Riddim-ID](https://riddim-id.com/) via its public API v1. RIDD
 
 - Targeted search: pick **Riddim** (default), **Tune** (titles only), **Artist** or **Label**; one upstream `/search?types=<target>` request, nothing else shown. Typo tolerant
 - The chosen target is kept in the URL (`/?type=tune&q=pumpkin+belly`) and remembered for next time
-- Compact tune table: Artist, Title, Riddim, Label, Year, then row actions: **YouTube / Copy / Dig**; the title links to the tune page
+- Compact tune table: Artist, Title, Riddim, Label, Year, then row actions: **YouTube / Copy / Dig**; the whole row opens the tune page (artist / riddim / label are plain text in lists, linked on the tune page)
 - YouTube: search results for `Artist Title` (new tab). Copy: `Artist - Title` to the clipboard.
 - Dig: a small menu (one shared popover, fixed position, keyboard + Escape/outside-click to close) with record-shop searches for `Artist Title`, by the visitor's country: everywhere **Discogs, eBay**; Japan adds **Mercari, Yahoo! Auctions**. Providers are config data in `shared/dig.ts` (`DIG_PROVIDERS`, `countries: ["*"] | ["JP"] | [...REGIONS.EU]`); `digProvidersFor(country)` is a pure function (ready for a manual region switch). Plain search URLs built in the browser — no API calls, no affiliate parameters
 - Country: the Worker stamps `<html data-country="JP">` from `request.cf.country` on the final HTML response (after the HTML cache, so cached pages stay country-neutral), marked `Cache-Control: private, no-cache` with no ETag. No IP lookup, nothing stored. Local testing: `.dev.vars` with `DEV_COUNTRY_OVERRIDE=1`, then `?country=JP|US|GB|none`

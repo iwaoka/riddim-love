@@ -1,6 +1,6 @@
 import './style.css';
 import { digProvidersFor, normalizeCountry } from '../shared/dig';
-import { copyText, displayText, externalSearchUrl, searchText } from '../shared/format';
+import { artistNames, copyText, displayText, externalSearchUrl, searchText } from '../shared/format';
 import { labelMeta, ORIGIN, parsePagePath, personMeta, refPath, riddimMeta, tuneMeta, tunePath, type PageMeta } from '../shared/seo';
 import { filterWords, matches } from '../shared/filter';
 import { sortRows, type SortDir, type SortKey } from '../shared/sort';
@@ -480,20 +480,41 @@ type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean };
 
 function tuneRow(row: Row, opts: TableOpts = {}): HTMLTableRowElement {
   const dash = () => h('span', { class: 'muted' }, '—');
+  // The whole row opens the tune page (see onRowClick); the title is the real
+  // link (keyboard, screen readers, middle-click). Artist / riddim / label are
+  // plain text here — the tune page links to them.
   return h('tr', { class: row.is_original ? 'orig' : null },
-    h('td', { class: 'c-artist' }, ...(row.artists.length ? joinLinks(row.artists, 'artist') : [dash()])),
+    h('td', { class: 'c-artist' }, row.artists.length ? artistNames(row.artists) : dash()),
     h('td', { class: 'c-title' },
       link(tunePath(row), row.title, 'tune-link'),
       row.is_original ? h('span', { class: 'badge', title: 'The original tune this riddim is named after' }, 'Original') : null,
     ),
-    opts.hideRiddim ? null : h('td', { class: 'c-riddim' }, row.riddim ? link(listHref('riddim', row.riddim), row.riddim.name) : dash()),
-    opts.hideLabel ? null : h('td', { class: 'c-label' }, row.label ? link(listHref('label', row.label), row.label.name) : dash()),
+    opts.hideRiddim ? null : h('td', { class: 'c-riddim' }, row.riddim ? row.riddim.name : dash()),
+    opts.hideLabel ? null : h('td', { class: 'c-label' }, row.label ? row.label.name : dash()),
     h('td', { class: 'c-year' }, row.year ? String(row.year) : ''),
     h('td', { class: 'c-act' }, h('span', { class: 'acts' }, ...rowActions(row))),
   );
 }
 
-const SORT_NAMES: Record<SortKey, string> = { artist: 'Artist', title: 'Title', riddim: 'Riddim', label: 'Label', year: 'Year' };
+/**
+ * Row click → the row's tune link. Clicks on buttons / links inside the row
+ * keep their own behaviour, and a drag that selected text does nothing.
+ */
+function onRowClick(e: MouseEvent) {
+  const target = e.target as Element;
+  if (target.closest('a, button, input, label, summary')) return;
+  const tr = target.closest('tr');
+  const a = tr?.querySelector<HTMLAnchorElement>('a.tune-link');
+  if (!a || getSelection()?.toString()) return;
+  if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) {
+    window.open(a.href, '_blank', 'noopener');
+    return;
+  }
+  if (e.button !== 0) return;
+  navigate(a.getAttribute('href')!);
+}
+
+const SORT_NAMES: Record<SortKey, string> ={ artist: 'Artist', title: 'Title', riddim: 'Riddim', label: 'Label', year: 'Year' };
 
 interface TuneTable {
   el: HTMLElement;
@@ -520,7 +541,9 @@ function tuneTable(
   let sort = opts.sort ?? null;
   let words: string[] = [];
   let shown = all.length;
-  const tbody = h('tbody', {});
+  const tbody = h('tbody', { class: 'rows-link' });
+  tbody.addEventListener('click', onRowClick);
+  tbody.addEventListener('auxclick', (e) => { if (e.button === 1) onRowClick(e); });
   const ths = new Map<SortKey, HTMLTableCellElement>();
   const cols = 4 + (opts.hideRiddim ? 0 : 1) + (opts.hideLabel ? 0 : 1);
 
