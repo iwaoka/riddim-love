@@ -90,9 +90,6 @@ button, select {
 button:hover, select:hover { border-color: var(--fg-2); }
 .search button { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
 .hint { display: none; margin: 0; color: var(--fg-2); font-size: 13px; }
-.yt-opts { border: 0; margin: 0 0 0 auto; padding: 0; display: flex; gap: 10px; align-items: center; font-size: 13px; color: var(--fg-2); }
-.yt-opts legend { float: left; padding: 0; margin-right: 2px; }
-.yt-opts label { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; white-space: nowrap; }
 
 /* home: big centered search */
 body.home .top {
@@ -109,7 +106,6 @@ body.home .search button { padding: 0 20px; }
 body.home .hint { display: block; text-align: center; }
 .tagline { display: none; margin: -8px 0 4px; color: var(--fg-2); }
 body.home .tagline { display: block; }
-body.home .yt-opts { display: none; }
 body.home main { display: none; }
 
 /* ---------- main ---------- */
@@ -204,10 +200,15 @@ a.act:hover { color: inherit; border-color: var(--fg-2); }
   .types { width: 100%; }
   .types label { flex: 1; text-align: center; }
   .types span { padding: 9px 4px; }
-  .yt-opts { margin-left: auto; }
   main { padding: 8px 12px 28px; }
   /* table → stacked rows: [copy] Artist / Title / riddim · label · year  [buttons] */
-  .tunes thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  /* header row becomes a strip of sort buttons */
+  .tunes thead { display: block; }
+  .tunes thead tr { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 0 8px; border-bottom: 1px solid var(--line); }
+  .tunes thead th { display: block; padding: 0; border: 0; width: auto !important; }
+  .tunes thead th.c-copy, .tunes thead th.c-act { position: absolute; width: 1px !important; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .tunes thead .sort-btn { border: 1px solid var(--line); border-radius: 99px; padding: 6px 12px; min-height: 36px; background: var(--bg-2); }
+  .tunes thead th[aria-sort="ascending"] .sort-btn, .tunes thead th[aria-sort="descending"] .sort-btn { border-color: var(--fg-2); color: var(--fg); background: var(--bg); }
   .tunes, .tunes tbody { display: block; }
   .tunes tbody tr {
     display: grid;
@@ -246,3 +247,17 @@ a.act:hover { color: inherit; border-color: var(--fg-2); }
 @media (max-width: 720px) {
   .names-table .c-note { width: 38%; }
 }
+
+/* ---------- sortable column headers ---------- */
+.sort-btn {
+  all: unset; box-sizing: border-box;
+  display: inline-flex; align-items: center; gap: 4px;
+  cursor: pointer; font: inherit; color: inherit;
+  text-transform: inherit; letter-spacing: inherit;
+  padding: 2px 0; border-radius: 3px;
+}
+.sort-btn:hover { color: var(--fg); }
+.sort-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sort-ind { font-size: 9px; min-width: 9px; color: var(--accent); }
+.tunes th[aria-sort="ascending"], .tunes th[aria-sort="descending"] { color: var(--fg); }
+.tunes th.c-year .sort-btn { justify-content: flex-end; }

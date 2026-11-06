@@ -21,26 +21,7 @@ export function displayText(artists: Ref[], title: string): string {
   return a ? `${a} – ${title}` : title;
 }
 
-export interface YoutubeOptions {
-  riddim: boolean;
-  label: boolean;
-}
-
-/** Riddim name with " Riddim" appended unless it already says so. */
-export function riddimTerm(name: string): string {
-  return /\briddim\b/i.test(name) ? name : `${name} Riddim`;
-}
-
-export function youtubeQuery(
-  t: { artists: Ref[]; title: string; riddim: Ref | null; label?: Ref | null },
-  opts: YoutubeOptions,
-): string {
-  const parts = [searchText(t.artists, t.title)];
-  if (opts.riddim && t.riddim?.name) parts.push(riddimTerm(t.riddim.name));
-  if (opts.label && t.label?.name) parts.push(t.label.name);
-  return parts.join(' ').replace(/\s+/g, ' ').trim();
-}
-
+/** YouTube search results URL for the given words (e.g. "Artist Title"). */
 export function youtubeUrl(query: string): string {
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query);
 }

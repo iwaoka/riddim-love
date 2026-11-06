@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sortByLabelArtistTitle } from '../shared/sort';
+import { sortByLabelArtistTitle, sortRows } from '../shared/sort';
 
 const r = (id: number, label: string | null, artist: string, title: string) => ({
   id,
@@ -31,5 +31,40 @@ describe('sortByLabelArtistTitle', () => {
     const out = ids(sortByLabelArtistTitle([r(1, 'L', 'éclair', 't'), r(2, 'L', 'Eclair', 'a'), r(3, 'L', 'ミighty', 't')]));
     expect(out.slice(0, 2)).toEqual([2, 1]);
     expect(out).toContain(3);
+  });
+});
+
+describe('sortRows (column sort)', () => {
+  const row = (id: number, artist: string, title: string, riddim: string | null, label: string | null, year: number | null) => ({
+    id, title, year,
+    artists: artist ? [{ id, name: artist, url: null }] : [],
+    riddim: riddim === null ? null : { id, name: riddim, url: null },
+    label: label === null ? null : { id, name: label, url: null },
+  });
+  const rows = [
+    row(1, 'Tenor Saw', 'Pumpkin Belly', 'Sleng Teng', 'Jammys', 1985),
+    row(2, 'anthony red rose', 'Tempo', 'Tempo', null, 1985),
+    row(3, 'Wayne Smith', 'Under Mi Sleng Teng', 'Sleng Teng', 'Jammys', null),
+    row(4, 'Cocoa Tea', 'Rocking Dolly', 'Rockfort Rock', 'Greensleeves', 1991),
+  ];
+  const ids = (r: { id: number }[]) => r.map((x) => x.id);
+
+  it('artist asc / desc, case-insensitive', () => {
+    expect(ids(sortRows(rows, 'artist', 'asc'))).toEqual([2, 4, 1, 3]);
+    expect(ids(sortRows(rows, 'artist', 'desc'))).toEqual([3, 1, 4, 2]);
+  });
+  it('title', () => {
+    expect(ids(sortRows(rows, 'title'))).toEqual([1, 4, 2, 3]);
+  });
+  it('riddim, ties broken by label → artist → title', () => {
+    expect(ids(sortRows(rows, 'riddim'))).toEqual([4, 1, 3, 2]);
+  });
+  it('label: blanks last in both directions', () => {
+    expect(ids(sortRows(rows, 'label', 'asc'))).toEqual([4, 1, 3, 2]);
+    expect(ids(sortRows(rows, 'label', 'desc'))).toEqual([1, 3, 4, 2]);
+  });
+  it('year numeric; unknown year last in both directions', () => {
+    expect(ids(sortRows(rows, 'year', 'asc'))).toEqual([1, 2, 4, 3]); // 1985 tie → label (blank last)
+    expect(ids(sortRows(rows, 'year', 'desc'))).toEqual([4, 1, 2, 3]);
   });
 });

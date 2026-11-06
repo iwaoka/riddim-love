@@ -1,30 +1,67 @@
 import { artistNames } from './format';
 import type { Ref } from './types';
 
-const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true, ignorePunctuation: false });
+const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
 
-interface Sortable {
+export interface Sortable {
   artists: Ref[];
   title: string;
+  riddim?: Ref | null;
   label?: Ref | null;
+  year?: number | null;
 }
 
+export type SortKey = 'artist' | 'title' | 'riddim' | 'label' | 'year';
+export type SortDir = 'asc' | 'desc';
+export const SORT_KEYS: readonly SortKey[] = ['artist', 'title', 'riddim', 'label', 'year'];
+
+const text = (row: Sortable, key: Exclude<SortKey, 'year'>): string => {
+  if (key === 'artist') return artistNames(row.artists).trim();
+  if (key === 'title') return row.title.trim();
+  return (row[key]?.name ?? '').trim();
+};
+
+/** Tie-break order after the chosen column. */
+const TIE: Exclude<SortKey, 'year'>[] = ['label', 'artist', 'title'];
+
 /**
- * Label → Artist → Title, ascending, case-insensitive (Intl.Collator).
- * Rows without a label go last. Ties keep their original order.
+ * Sorts by one column, ascending or descending (Intl.Collator, case-insensitive,
+ * numbers in natural order). Empty values always go last, whatever the direction.
+ * Ties fall back to Label → Artist → Title (ascending), then the original order.
  * Returns a new array; the input is untouched.
  */
-export function sortByLabelArtistTitle<T extends Sortable>(rows: readonly T[]): T[] {
+export function sortRows<T extends Sortable>(rows: readonly T[], key: SortKey, dir: SortDir = 'asc'): T[] {
+  const sign = dir === 'asc' ? 1 : -1;
   return rows
-    .map((row, i) => ({ row, i, label: row.label?.name?.trim() ?? '', artist: artistNames(row.artists).trim() }))
+    .map((row, i) => ({ row, i }))
     .sort((a, b) => {
-      if (!a.label !== !b.label) return a.label ? -1 : 1;
-      return (
-        collator.compare(a.label, b.label) ||
-        collator.compare(a.artist, b.artist) ||
-        collator.compare(a.row.title, b.row.title) ||
-        a.i - b.i
-      );
+      let primary = 0;
+      if (key === 'year') {
+        const ya = a.row.year ?? null;
+        const yb = b.row.year ?? null;
+        if ((ya === null) !== (yb === null)) return ya === null ? 1 : -1;
+        primary = ya !== null && yb !== null ? (ya - yb) * sign : 0;
+      } else {
+        const ta = text(a.row, key);
+        const tb = text(b.row, key);
+        if (!ta !== !tb) return ta ? -1 : 1;
+        primary = collator.compare(ta, tb) * sign;
+      }
+      if (primary) return primary;
+      for (const k of TIE) {
+        if (k === key) continue;
+        const ta = text(a.row, k);
+        const tb = text(b.row, k);
+        if (!ta !== !tb) return ta ? -1 : 1;
+        const c = collator.compare(ta, tb);
+        if (c) return c;
+      }
+      return a.i - b.i;
     })
     .map((x) => x.row);
+}
+
+/** Label → Artist → Title, ascending; blank labels last; stable. */
+export function sortByLabelArtistTitle<T extends Sortable>(rows: readonly T[]): T[] {
+  return sortRows(rows, 'label', 'asc');
 }

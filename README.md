@@ -13,8 +13,8 @@ Data provided by [Riddim-ID](https://riddim-id.com/) via its public API v1. RIDD
 - Targeted search: pick **Riddim** (default), **Tune** (titles only), **Artist** or **Label**; one upstream `/search?types=<target>` request, nothing else shown. Typo tolerant
 - The chosen target is kept in the URL (`/?type=tune&q=pumpkin+belly`) and remembered for next time
 - Compact tune table: copy icon first, then Artist, Title, Riddim, Label, Year
-- One-click copy as `Artist - Title`; YouTube search button (`Artist Title`, optionally `+ Riddim`, `+ Label`)
-- Tune results sorted client-side by Label → Artist → Title (`Intl.Collator`, case-insensitive, stable, blank labels last). Search hits carry no label, so in practice this is Artist → Title
+- One-click copy as `Artist - Title`; YouTube search button (`Artist Title`)
+- Click a column header (Artist, Title, Riddim, Label, Year) to sort; click again to reverse. Client-side over the rows on screen (`Intl.Collator`, case-insensitive, blanks last, ties → Label → Artist → Title, stable). No extra requests: on paged lists only loaded rows are sorted, and the page says so. Tune search defaults to Artist → Title (search hits carry no label)
 - Full tune lists per riddim / artist / producer / label with "Load more" (cursor pagination)
 - Riddim filter (title or artist), sort, and "include versions"
 - Shareable URLs (`/?type=riddim&q=`, `/?riddim=18`, `/?artist=263`, `/?label=61`, `/?tune=759`)

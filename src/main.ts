@@ -1,6 +1,6 @@
 import './style.css';
-import { artistNames, copyText, displayText, searchText, youtubeQuery, youtubeUrl, type YoutubeOptions } from '../shared/format';
-import { sortByLabelArtistTitle } from '../shared/sort';
+import { artistNames, copyText, displayText, searchText, youtubeUrl } from '../shared/format';
+import { sortRows, type SortDir, type SortKey } from '../shared/sort';
 import type { ApiError, ListKind, NameHit, Ref, Riddim, RiddimRef, SearchResult, SearchType, Tune, TuneHit, TuneList } from '../shared/types';
 import { append, h, safeExternal } from './dom';
 
@@ -9,28 +9,11 @@ const main = document.getElementById('main') as HTMLElement;
 const form = document.getElementById('search-form') as HTMLFormElement;
 const input = document.getElementById('q') as HTMLInputElement;
 const announcer = document.getElementById('announce') as HTMLElement;
-const ytRiddim = document.getElementById('yt-riddim') as HTMLInputElement;
-const ytLabel = document.getElementById('yt-label') as HTMLInputElement;
-
-// ---------- YouTube options (per-viewer convenience) ----------
-const YT_KEY = 'riddim.love:yt';
-const yt: YoutubeOptions = { riddim: false, label: false };
+// The old "YouTube search adds" preference is no longer used.
 try {
-  Object.assign(yt, JSON.parse(localStorage.getItem(YT_KEY) ?? '{}'));
+  localStorage.removeItem('riddim.love:yt');
 } catch {
   /* storage unavailable */
-}
-ytRiddim.checked = !!yt.riddim;
-ytLabel.checked = !!yt.label;
-for (const [box, key] of [[ytRiddim, 'riddim'], [ytLabel, 'label']] as const) {
-  box.addEventListener('change', () => {
-    yt[key] = box.checked;
-    try {
-      localStorage.setItem(YT_KEY, JSON.stringify(yt));
-    } catch {
-      /* ignore */
-    }
-  });
 }
 
 const announce = (msg: string) => {
@@ -249,12 +232,10 @@ function copyButton(text: string, cls = ''): HTMLButtonElement {
 }
 
 function youtubeButton(row: Row): HTMLButtonElement {
-  const btn = h('button', { type: 'button', class: 'act yt', 'aria-label': `Search YouTube for ${searchText(row.artists, row.title)}` }, 'YouTube');
-  const update = () => (btn.title = 'YouTube: ' + youtubeQuery({ ...row, label: row.label ?? null }, yt));
-  btn.addEventListener('mouseenter', update);
-  btn.addEventListener('focus', update);
+  const query = searchText(row.artists, row.title);
+  const btn = h('button', { type: 'button', class: 'act yt', 'aria-label': `Search YouTube for ${query}`, title: `YouTube: ${query}` }, 'YouTube');
   btn.addEventListener('click', () => {
-    window.open(youtubeUrl(youtubeQuery({ ...row, label: row.label ?? null }, yt)), '_blank', 'noopener,noreferrer');
+    window.open(youtubeUrl(query), '_blank', 'noopener,noreferrer');
   });
   return btn;
 }
@@ -286,24 +267,83 @@ function tuneRow(row: Row, opts: TableOpts = {}): HTMLTableRowElement {
   );
 }
 
-function tuneTable(rows: Row[], opts: TableOpts = {}): HTMLElement {
-  const head = (cls: string, text: string, sr = false) => h('th', { scope: 'col', class: cls }, sr ? h('span', { class: 'sr-only' }, text) : text);
-  return h('div', { class: 'tunes-wrap' },
+const SORT_NAMES: Record<SortKey, string> = { artist: 'Artist', title: 'Title', riddim: 'Riddim', label: 'Label', year: 'Year' };
+
+interface TuneTable {
+  el: HTMLElement;
+  /** Appends rows (e.g. "Load more"); re-sorts when a column sort is active. */
+  add(rows: Row[]): void;
+  /** Current column sort, or null for the source order. */
+  sort(): { key: SortKey; dir: SortDir } | null;
+}
+
+/**
+ * Tune table. Column headers are sort buttons (click: ascending, again: descending).
+ * Sorting is client-side over the rows held by the table — no extra requests.
+ */
+function tuneTable(
+  rows: Row[],
+  opts: TableOpts & { sort?: { key: SortKey; dir: SortDir } | null; onSort?: () => void } = {},
+): TuneTable {
+  const all = [...rows];
+  let sort = opts.sort ?? null;
+  const tbody = h('tbody', {});
+  const ths = new Map<SortKey, HTMLTableCellElement>();
+
+  const paint = () => {
+    const ordered = sort ? sortRows(all, sort.key, sort.dir) : all;
+    tbody.replaceChildren(...ordered.map((r) => tuneRow(r, opts)));
+    for (const [key, th] of ths) {
+      const active = sort?.key === key;
+      th.setAttribute('aria-sort', active ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+      const ind = th.querySelector('.sort-ind') as HTMLElement;
+      ind.textContent = active ? (sort!.dir === 'asc' ? '▲' : '▼') : '';
+      (th.querySelector('button') as HTMLButtonElement).title = active
+        ? `Sorted by ${SORT_NAMES[key]} (${sort!.dir === 'asc' ? 'A–Z / oldest first' : 'Z–A / newest first'}). Click to reverse.`
+        : `Sort by ${SORT_NAMES[key]}`;
+    }
+  };
+
+  const sortHead = (key: SortKey) => {
+    const btn = h('button', { type: 'button', class: 'sort-btn' }, SORT_NAMES[key], h('span', { class: 'sort-ind', 'aria-hidden': 'true' }));
+    btn.addEventListener('click', () => {
+      sort = sort?.key === key ? { key, dir: sort.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' };
+      paint();
+      announce(`Sorted by ${SORT_NAMES[key]}, ${sort.dir === 'asc' ? 'ascending' : 'descending'}`);
+      opts.onSort?.();
+    });
+    const th = h('th', { scope: 'col', class: `c-${key}` }, btn);
+    ths.set(key, th);
+    return th;
+  };
+  const plainHead = (cls: string, text: string) => h('th', { scope: 'col', class: cls }, h('span', { class: 'sr-only' }, text));
+
+  const el = h('div', { class: 'tunes-wrap' },
     h('table', { class: 'tunes' },
       h('thead', {},
         h('tr', {},
-          head('c-copy', 'Copy', true),
-          head('c-artist', 'Artist'),
-          head('c-title', 'Title'),
-          opts.hideRiddim ? null : head('c-riddim', 'Riddim'),
-          opts.hideLabel ? null : head('c-label', 'Label'),
-          head('c-year', 'Year'),
-          head('c-act', 'Actions', true),
+          plainHead('c-copy', 'Copy'),
+          sortHead('artist'),
+          sortHead('title'),
+          opts.hideRiddim ? null : sortHead('riddim'),
+          opts.hideLabel ? null : sortHead('label'),
+          sortHead('year'),
+          plainHead('c-act', 'Actions'),
         ),
       ),
-      h('tbody', {}, ...rows.map((r) => tuneRow(r, opts))),
+      tbody,
     ),
   );
+  paint();
+  return {
+    el,
+    add(more) {
+      all.push(...more);
+      if (sort) paint();
+      else append(tbody, more.map((r) => tuneRow(r, opts)));
+    },
+    sort: () => sort,
+  };
 }
 
 // ---------- states ----------
@@ -401,8 +441,9 @@ async function renderSearch(q: string, type: SearchType, signal: AbortSignal) {
   let body: HTMLElement;
   let note: string;
   if (type === 'tune') {
-    note = countNote(n, res.limit, 'title matches', ' Searching tune titles only. Sorted by artist, then title.');
-    body = tuneTable(sortByLabelArtistTitle(res.tunes.map((t: TuneHit) => ({ ...t, label: null }))), { hideLabel: true });
+    note = countNote(n, res.limit, 'title matches', ' Searching tune titles only. Click a column to sort.');
+    // Search hits carry no label, so the default Label → Artist → Title order is Artist → Title.
+    body = tuneTable(res.tunes.map((t: TuneHit) => ({ ...t, label: null })), { hideLabel: true, sort: { key: 'artist', dir: 'asc' } }).el;
   } else {
     note = countNote(n, res.limit, TYPE_UI[type].plural, ` Open one to see all its tunes.`);
     body = namesTable(type, res.names.filter((x) => x.type === type));
@@ -501,15 +542,25 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
   versions?.addEventListener('change', apply);
 
   const count = h('p', { class: 'count muted' });
-  const table = tuneTable(list.tunes, { hideRiddim: kind === 'riddim' && !route.versions, hideLabel: kind === 'label' });
-  const ul = table.querySelector('tbody') as HTMLTableSectionElement;
   const more = h('button', { type: 'button', class: 'more' }, 'Load more');
   let shown = list.tunes.length;
   let cursor = list.next_cursor;
   const setCount = () => {
-    count.textContent = list.total != null ? `${shown} of ${list.total} tunes` : `${shown} tunes`;
+    let s = list.total != null ? `${shown} of ${list.total} tunes` : `${shown} tunes`;
+    const active = table?.sort();
+    if (active) {
+      s += ` · sorted by ${SORT_NAMES[active.key]} ${active.dir === 'asc' ? '▲' : '▼'}`;
+      // Client-side sort covers loaded rows only; say so while more pages exist.
+      if (cursor) s += ' (loaded rows only — Load more adds and re-sorts)';
+    }
+    count.textContent = s;
     more.hidden = !cursor;
   };
+  const table: TuneTable = tuneTable(list.tunes, {
+    hideRiddim: kind === 'riddim' && !route.versions,
+    hideLabel: kind === 'label',
+    onSort: () => setCount(),
+  });
   setCount();
   more.addEventListener('click', async () => {
     if (!cursor) return;
@@ -517,7 +568,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
     more.textContent = 'Loading…';
     try {
       const page = await api<TuneList>(base + '?' + new URLSearchParams({ ...params, cursor }));
-      append(ul, page.tunes.map((t) => tuneRow(t, { hideRiddim: kind === 'riddim' && !route.versions, hideLabel: kind === 'label' })));
+      table.add(page.tunes);
       shown += page.tunes.length;
       cursor = page.next_cursor;
       announce(`${page.tunes.length} more tunes loaded`);
@@ -537,7 +588,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
     head,
     controls,
     count,
-    list.tunes.length ? table : h('p', { class: 'state' }, route.f ? `No tunes match “${route.f}”.` : 'No tunes listed.'),
+    list.tunes.length ? table.el : h('p', { class: 'state' }, route.f ? `No tunes match “${route.f}”.` : 'No tunes listed.'),
     more,
   );
   announce(`${name}: ${count.textContent}`);
