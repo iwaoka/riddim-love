@@ -3,6 +3,7 @@ import { digProvidersFor, normalizeCountry } from '../shared/dig';
 import { artistNames, copyText, displayText, externalSearchUrl, searchText } from '../shared/format';
 import { labelMeta, ORIGIN, parsePagePath, personMeta, refPath, riddimMeta, tuneMeta, tunePath, type PageMeta } from '../shared/seo';
 import { filterWords, matches } from '../shared/filter';
+import { sameName, splitArtistTitle, type ArtistTitle } from '../shared/pair';
 import { sortRows, type SortDir, type SortKey } from '../shared/sort';
 
 const HOME_TITLE = 'RIDDIM.LOVE — Riddim search for reggae & dancehall selectors';
@@ -117,7 +118,7 @@ const typeRadios = [...document.querySelectorAll<HTMLInputElement>('#types input
 
 const TYPE_UI: Record<SearchType, { placeholder: string; label: string; plural: string }> = {
   riddim: { placeholder: 'Riddim name, e.g. Sleng Teng', label: 'Search riddim names', plural: 'riddims' },
-  tune: { placeholder: 'Tune title, e.g. Pumpkin Belly', label: 'Search tune titles', plural: 'tunes' },
+  tune: { placeholder: 'Title or Artist - Title', label: 'Search tune titles, or paste Artist - Title', plural: 'tunes' },
   artist: { placeholder: 'Artist name, e.g. Tenor Saw', label: 'Search artist names', plural: 'artists' },
   label: { placeholder: 'Label name, e.g. Jammys', label: 'Search label names', plural: 'labels' },
 };
@@ -647,7 +648,7 @@ function renderHome() {
 
 const NO_MATCH_TIP: Record<SearchType, string> = {
   riddim: 'Try another spelling or fewer words. Riddim names often drop the word “Riddim”.',
-  tune: 'Tune search looks at titles only. To find an artist’s tunes, switch to Artist.',
+  tune: 'Tune search looks at titles. Paste “Artist - Title” to look through that artist’s tunes (beta), or switch to Artist.',
   artist: 'Try another spelling, or the artist’s best-known name.',
   label: 'Try another spelling, or the label’s short name.',
 };
@@ -695,6 +696,9 @@ async function renderSearch(q: string, type: SearchType, signal: AbortSignal) {
     main.replaceChildren(h('p', { class: 'state' }, 'Type at least 2 characters.'));
     return;
   }
+  const pair = type === 'tune' ? splitArtistTitle(q) : null;
+  if (pair && (await artistTitleSearch(pair, signal))) return;
+  if (signal.aborted) return;
   loading(type === 'tune' ? 'Searching tune titles…' : `Searching ${TYPE_UI[type].plural}…`);
   const res = await api<SearchResult>('/api/search?' + new URLSearchParams({ type, q }), signal);
   if (signal.aborted) return;
@@ -704,7 +708,7 @@ async function renderSearch(q: string, type: SearchType, signal: AbortSignal) {
     main.replaceChildren(
       h('div', { class: 'state' },
         h('p', {}, type === 'tune' ? `No tune titles match “${res.query}”.` : `No ${TYPE_UI[type].plural} match “${res.query}”.`),
-        h('p', { class: 'muted' }, NO_MATCH_TIP[type]),
+        h('p', { class: 'muted' }, pair ? `No artist page is named “${pair.primary}” either. Check the spelling, or search the title alone.` : NO_MATCH_TIP[type]),
       ),
     );
     announce('No matches');
@@ -733,7 +737,64 @@ async function renderSearch(q: string, type: SearchType, signal: AbortSignal) {
   announce(`${n} ${TYPE_UI[type].plural} found`);
 }
 
-const KIND_LABEL: Record<ListKind, string> = { riddim: 'Riddim', artist: 'Artist', producer: 'Producer', label: 'Label' };
+/**
+ * Beta: "Artist - Title" in the tune search. The upstream search matches tune
+ * titles only, so look the artist up by name and open that artist's page
+ * filtered by the title (whole list, no 50-hit cap). Two requests at most
+ * here (artist search, then title search as the fallback).
+ * Returns true when it rendered something; false → run the plain title search.
+ */
+async function artistTitleSearch(pair: ArtistTitle, signal: AbortSignal): Promise<boolean> {
+  loading(`Looking up ${pair.primary}…`);
+  const res = await api<SearchResult>('/api/search?' + new URLSearchParams({ type: 'artist', q: pair.primary }), signal);
+  if (signal.aborted) return true;
+  const exact = res.names.filter((n) => n.type === 'artist' && (sameName(pair.primary, n.name) || sameName(pair.primary, n.matched_name)));
+  const artistHref = (n: NameHit) => withQuery(listHref('artist', n), { f: pair.title });
+
+  if (exact.length === 1) {
+    navigate(artistHref(exact[0]), true); // Back returns to where the search started
+    return true;
+  }
+  if (exact.length > 1) {
+    // Several artists share the name: let the visitor pick.
+    main.replaceChildren(
+      h('section', { class: 'results', 'aria-label': `Artists named ${pair.primary}` },
+        h('div', { class: 'section-head' },
+          h('h2', {}, 'Artist - Title ', h('span', { class: 'badge' }, 'Beta')),
+          h('p', { class: 'muted' }, `${exact.length} artists are named “${pair.primary}”. Pick one to see “${pair.title}” in their tunes.`),
+        ),
+        h('ul', { class: 'pick-list' }, ...exact.map((n) => h('li', {}, link(artistHref(n), n.name)))),
+      ),
+    );
+    announce(`${exact.length} artists named ${pair.primary}`);
+    return true;
+  }
+
+  // No artist by that name: search the title part, keep hits by that artist.
+  loading('Searching tune titles…');
+  const t = await api<SearchResult>('/api/search?' + new URLSearchParams({ type: 'tune', q: pair.title }), signal);
+  if (signal.aborted) return true;
+  const words = filterWords(pair.artist);
+  const byArtist = t.tunes.filter((x) => matches({ artists: x.artists, title: '' }, words));
+  const rows = byArtist.length ? byArtist : t.tunes;
+  if (!rows.length) return false;
+  const note = byArtist.length
+    ? `No artist page is named exactly “${pair.primary}”; showing title matches for “${pair.title}” by matching artists.`
+    : `No artist named “${pair.primary}” was found; showing all title matches for “${pair.title}”.`;
+  main.replaceChildren(
+    h('section', { class: 'results', 'aria-label': `Tunes matching ${pair.title}` },
+      h('div', { class: 'section-head' },
+        h('h2', {}, 'Artist - Title ', h('span', { class: 'badge' }, 'Beta')),
+        h('p', { class: 'muted' }, note),
+      ),
+      tuneTable(rows.map((x: TuneHit) => ({ ...x, label: null })), { hideLabel: true, sort: { key: 'artist', dir: 'asc' } }).el,
+    ),
+  );
+  announce(`${rows.length} tunes found`);
+  return true;
+}
+
+const KIND_LABEL: Record<ListKind, string> ={ riddim: 'Riddim', artist: 'Artist', producer: 'Producer', label: 'Label' };
 const KIND_PATH: Record<ListKind, string> = { riddim: 'riddims', artist: 'artists', producer: 'producers', label: 'labels' };
 
 function nameFromTunes(kind: ListKind, id: number, tunes: Tune[]): Ref | null {
