@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sameName, splitArtistTitle } from '../shared/pair';
+import { sameName, splitArtistTitle, splitByArtistPrefix } from '../shared/pair';
 
 describe('splitArtistTitle', () => {
   it('splits the Copy format', () => {
@@ -32,5 +32,22 @@ describe('sameName', () => {
     expect(sameName('Jammys', "Jammy's")).toBe(true);
     expect(sameName('Wayne Smith', 'Wayne Smith Jr')).toBe(false);
     expect(sameName('Wayne Smith', null)).toBe(false);
+  });
+});
+
+describe('splitByArtistPrefix', () => {
+  const hits = [{ name: 'Tenor' }, { name: 'Tenor Saw' }, { name: 'Tenor Cat' }, { name: 'Wayne Smith' }, { name: 'Super Cat' }, { name: 'Sizzla', matched_name: 'Sizzla Kalonji' }];
+  it('takes the longest artist name the query starts with', () => {
+    expect(splitByArtistPrefix('Tenor Saw Ring The Alarm', hits)).toEqual({ name: 'Tenor Saw', title: 'Ring The Alarm' });
+    expect(splitByArtistPrefix('wayne smith under mi sleng teng', hits)).toEqual({ name: 'Wayne Smith', title: 'under mi sleng teng' });
+  });
+  it('matches aliases but returns the main name', () => {
+    expect(splitByArtistPrefix('Sizzla Kalonji Black Woman And Child', hits)).toEqual({ name: 'Sizzla', title: 'Black Woman And Child' });
+  });
+  it('needs a whole-word prefix and something left for the title', () => {
+    expect(splitByArtistPrefix('Tenors Saw Ring', hits)).toBeNull();
+    expect(splitByArtistPrefix('Tenor Saw', hits)).toEqual({ name: 'Tenor', title: 'Saw' }); // then filtered on that page
+    expect(splitByArtistPrefix('Super Cat', [{ name: 'Super Cat' }])).toBeNull();
+    expect(splitByArtistPrefix('Ring The Alarm Tenor Saw', hits)).toBeNull();
   });
 });

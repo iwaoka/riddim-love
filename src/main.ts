@@ -3,7 +3,7 @@ import { digProvidersFor, normalizeCountry } from '../shared/dig';
 import { artistNames, copyText, displayText, externalSearchUrl, searchText } from '../shared/format';
 import { labelMeta, ORIGIN, parsePagePath, personMeta, refPath, riddimMeta, tuneMeta, tunePath, type PageMeta } from '../shared/seo';
 import { filterWords, matches } from '../shared/filter';
-import { sameName, splitArtistTitle, type ArtistTitle } from '../shared/pair';
+import { sameName, splitArtistTitle, splitByArtistPrefix, type ArtistTitle } from '../shared/pair';
 import { sortRows, type SortDir, type SortKey } from '../shared/sort';
 
 const HOME_TITLE = 'RIDDIM.LOVE — Riddim search for reggae & dancehall selectors';
@@ -648,7 +648,7 @@ function renderHome() {
 
 const NO_MATCH_TIP: Record<SearchType, string> = {
   riddim: 'Try another spelling or fewer words. Riddim names often drop the word “Riddim”.',
-  tune: 'Tune search looks at titles. Paste “Artist - Title” to look through that artist’s tunes (beta), or switch to Artist.',
+  tune: 'Tune search looks at titles. “Artist - Title” or “Artist Title” also works (beta), or switch to Artist.',
   artist: 'Try another spelling, or the artist’s best-known name.',
   label: 'Try another spelling, or the label’s short name.',
 };
@@ -704,6 +704,9 @@ async function renderSearch(q: string, type: SearchType, signal: AbortSignal) {
   if (signal.aborted) return;
 
   const n = type === 'tune' ? res.tunes.length : res.names.length;
+  // No title matched and no separator: maybe "Artist Title" (beta).
+  if (!n && type === 'tune' && !pair && /\s/.test(q.trim()) && (await artistPrefixSearch(q, signal))) return;
+  if (signal.aborted) return;
   if (!n) {
     main.replaceChildren(
       h('div', { class: 'state' },
@@ -744,29 +747,56 @@ async function renderSearch(q: string, type: SearchType, signal: AbortSignal) {
  * here (artist search, then title search as the fallback).
  * Returns true when it rendered something; false → run the plain title search.
  */
+/**
+ * Beta: "Artist Title" with no separator, tried only after the title search
+ * found nothing (one more request). The artist search on the whole query
+ * ranks names by their first words, so the artist must come first:
+ * "Tenor Saw Ring The Alarm" works, "Ring The Alarm Tenor Saw" does not.
+ * The whole query being an artist's name opens that artist's page.
+ */
+async function artistPrefixSearch(q: string, signal: AbortSignal): Promise<boolean> {
+  loading('Looking for an artist name…');
+  const res = await api<SearchResult>('/api/search?' + new URLSearchParams({ type: 'artist', q }), signal);
+  if (signal.aborted) return true;
+  const hits = res.names.filter((n) => n.type === 'artist');
+  const whole = hits.filter((n) => sameName(q, n.name) || sameName(q, n.matched_name));
+  if (whole.length === 1) {
+    navigate(listHref('artist', whole[0]), true);
+    return true;
+  }
+  const split = splitByArtistPrefix(q, hits);
+  if (!split) return false;
+  const exact = hits.filter((n) => sameName(split.name, n.name));
+  showArtistMatches(exact, split.name, split.title);
+  return true;
+}
+
+/** One artist → open their page filtered by the title; several → pick one. */
+function showArtistMatches(exact: NameHit[], name: string, title: string) {
+  const artistHref = (n: NameHit) => withQuery(listHref('artist', n), { f: title });
+  if (exact.length === 1) {
+    navigate(artistHref(exact[0]), true); // Back returns to where the search started
+    return;
+  }
+  main.replaceChildren(
+    h('section', { class: 'results', 'aria-label': `Artists named ${name}` },
+      h('div', { class: 'section-head' },
+        h('h2', {}, 'Artist - Title ', h('span', { class: 'badge' }, 'Beta')),
+        h('p', { class: 'muted' }, `${exact.length} artists are named “${name}”. Pick one to see “${title}” in their tunes.`),
+      ),
+      h('ul', { class: 'pick-list' }, ...exact.map((n) => h('li', {}, link(artistHref(n), n.name)))),
+    ),
+  );
+  announce(`${exact.length} artists named ${name}`);
+}
+
 async function artistTitleSearch(pair: ArtistTitle, signal: AbortSignal): Promise<boolean> {
   loading(`Looking up ${pair.primary}…`);
   const res = await api<SearchResult>('/api/search?' + new URLSearchParams({ type: 'artist', q: pair.primary }), signal);
   if (signal.aborted) return true;
   const exact = res.names.filter((n) => n.type === 'artist' && (sameName(pair.primary, n.name) || sameName(pair.primary, n.matched_name)));
-  const artistHref = (n: NameHit) => withQuery(listHref('artist', n), { f: pair.title });
-
-  if (exact.length === 1) {
-    navigate(artistHref(exact[0]), true); // Back returns to where the search started
-    return true;
-  }
-  if (exact.length > 1) {
-    // Several artists share the name: let the visitor pick.
-    main.replaceChildren(
-      h('section', { class: 'results', 'aria-label': `Artists named ${pair.primary}` },
-        h('div', { class: 'section-head' },
-          h('h2', {}, 'Artist - Title ', h('span', { class: 'badge' }, 'Beta')),
-          h('p', { class: 'muted' }, `${exact.length} artists are named “${pair.primary}”. Pick one to see “${pair.title}” in their tunes.`),
-        ),
-        h('ul', { class: 'pick-list' }, ...exact.map((n) => h('li', {}, link(artistHref(n), n.name)))),
-      ),
-    );
-    announce(`${exact.length} artists named ${pair.primary}`);
+  if (exact.length) {
+    showArtistMatches(exact, pair.primary, pair.title);
     return true;
   }
 

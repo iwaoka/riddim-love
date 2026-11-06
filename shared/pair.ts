@@ -31,6 +31,32 @@ export function splitArtistTitle(query: string): ArtistTitle | null {
   return { artist, primary, title };
 }
 
+/**
+ * "Artist Title" with no separator: the longest artist name (from an artist
+ * search on the whole query) that the query starts with, word for word.
+ * Returns that name and the rest as the title; null when none fits or
+ * nothing is left over for the title.
+ */
+export function splitByArtistPrefix(
+  query: string,
+  artists: readonly { name: string; matched_name?: string | null }[],
+): { name: string; title: string } | null {
+  const words = query.trim().split(/\s+/);
+  const folded = words.map(fold);
+  let best: { name: string; title: string; n: number } | null = null;
+  for (const a of artists) {
+    for (const name of [a.name, a.matched_name]) {
+      if (!name) continue;
+      const nameWords = fold(name).split(' ').filter(Boolean);
+      const n = nameWords.length;
+      if (!n || n >= words.length || (best && n <= best.n)) continue;
+      // Compare word by word on folded text ("Jammy's" = "Jammys").
+      if (nameWords.every((w, i) => folded[i] === w)) best = { name: a.name, title: words.slice(n).join(' '), n };
+    }
+  }
+  return best && { name: best.name, title: best.title };
+}
+
 /** Same name, ignoring case, accents and apostrophes. */
 export function sameName(a: string, b: string | null | undefined): boolean {
   return !!b && fold(a) === fold(b);
