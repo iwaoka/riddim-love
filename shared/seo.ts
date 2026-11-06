@@ -79,14 +79,15 @@ export interface PageMeta {
   h1: string;
 }
 
-export function riddimMeta(r: { name: string; year: number | null; summary: string | null }, total: number | null, tunes: Tune[]): PageMeta {
+// No year / producer: a riddim list also holds later same-name re-licks
+// (other years, other producers), so the original's facts would mislead.
+export function riddimMeta(r: { name: string }, total: number | null, tunes: Tune[]): PageMeta {
   const h1 = riddimName(r.name);
   const count = total != null ? ` – ${total} ${total === 1 ? 'Tune' : 'Tunes'}` : '';
-  const base = r.summary ?? `${h1}${r.year ? ` (${r.year})` : ''}.`;
   const ex = examples(tunes);
   return {
-    title: `${h1}${r.year ? ` (${r.year})` : ''}${count} | ${SITE}`,
-    description: clip(`${base} Tune list with artist, label and year${ex ? `: ${ex}` : ''}.`),
+    title: `${h1}${count} | ${SITE}`,
+    description: clip(`${h1}${count}. Tune list with artist, label and year${ex ? `: ${ex}` : ''}.`),
     h1,
   };
 }

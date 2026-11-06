@@ -45,8 +45,9 @@ describe('page meta', () => {
     expect(riddimName('Real Rock Riddim')).toBe('Real Rock Riddim');
   });
   it('riddim title/description/h1', () => {
-    const m = riddimMeta({ name: 'Sleng Teng', year: 1985, summary: 'Sleng Teng Riddim (1985), produced by King Jammy.' }, 313, [tune]);
-    expect(m.title).toBe('Sleng Teng Riddim (1985) – 313 Tunes | RIDDIM.LOVE');
+    const m = riddimMeta({ name: 'Sleng Teng' }, 313, [tune]);
+    expect(m.title).toBe('Sleng Teng Riddim – 313 Tunes | RIDDIM.LOVE');
+    expect(m.description).not.toMatch(/1985|King Jammy/);
     expect(m.h1).toBe('Sleng Teng Riddim');
     expect(m.description).toContain('Wayne Smith – Under Mi Sleng Teng');
     expect(m.description.length).toBeLessThanOrEqual(158);
