@@ -24,6 +24,9 @@ import type { Entity, Ref, Riddim, SsrData, Tune, TuneList } from '../shared/typ
 import { apiPath, loadEntity, loadRiddim, loadTune, loadTunes } from './data';
 import { UpstreamError, type UpstreamStats } from './upstream';
 
+/** Seconds rendered HTML is kept at the edge (upstream data itself uses s-maxage, 300 s). */
+const HTML_TTL = 120;
+
 export interface PageEnv {
   ASSETS: Fetcher;
 }
@@ -220,6 +223,16 @@ export async function servePage(
   page: { kind: PageKind; id: number; slug: string },
 ): Promise<Response> {
   const started = Date.now();
+  // Rendered HTML is kept briefly at the edge (shorter than the upstream data
+  // TTL, so no data outlives Riddim-ID's own cache window by much).
+  const htmlKey = new Request(`${ORIGIN}/__internal/html${url.pathname}${url.search}`);
+  const cachedHtml = await caches.default.match(htmlKey);
+  if (cachedHtml) {
+    const res = new Response(cachedHtml.body, cachedHtml);
+    res.headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
+    res.headers.set('Server-Timing', `ssr;dur=${Date.now() - started}, html;desc="cache hit"`);
+    return res;
+  }
   const stats: UpstreamStats = { hits: 0, misses: 0 };
   let built: Built;
   try {
@@ -275,12 +288,19 @@ export async function servePage(
     })
     .transform(new Response(template.body, template));
 
-  const out = new Response(rewritten.body, rewritten);
-  out.headers.set('Content-Type', 'text/html; charset=utf-8');
-  out.headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
-  if (noindex) out.headers.set('X-Robots-Tag', 'noindex, follow');
-  out.headers.set('Server-Timing', `ssr;dur=${Date.now() - started}, upstream;desc="hit ${stats.hits} miss ${stats.misses}"`);
-  out.headers.delete('ETag'); // the template's ETag does not describe this page
-  return out;
+  const html = await rewritten.text();
+  const headers = new Headers(rewritten.headers);
+  headers.set('Content-Type', 'text/html; charset=utf-8');
+  if (noindex) headers.set('X-Robots-Tag', 'noindex, follow');
+  headers.delete('ETag'); // the template's ETag does not describe this page
+  headers.delete('Content-Length');
+
+  const toCache = new Headers(headers);
+  toCache.set('Cache-Control', `public, max-age=${HTML_TTL}`);
+  ctx.waitUntil(caches.default.put(htmlKey, new Response(html, { headers: toCache })));
+
+  headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
+  headers.set('Server-Timing', `ssr;dur=${Date.now() - started}, upstream;desc="hit ${stats.hits} miss ${stats.misses}"`);
+  return new Response(html, { status: 200, headers });
 }
 
