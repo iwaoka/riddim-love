@@ -240,6 +240,7 @@ const ICONS = {
   play: ['poly:6 3 20 12 6 21 6 3'],
   disc: ['circle:12,12,10', 'circle:12,12,2'],
   info: ['circle:12,12,10', 'M12 16v-4', 'M12 8h.01'],
+  share: ['M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8', 'M16 6l-4-4-4 4', 'M12 2v13'],
 } as const;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -308,6 +309,40 @@ function youtubeButton(row: Pick<Row, 'artists' | 'title'>): HTMLAnchorElement {
     title: label,
     'aria-label': label,
   }, icon('play', 13), actLabel('YouTube', true));
+}
+
+/**
+ * Share this page: the system share sheet where there is one (phones), else
+ * copy the link. Nothing is sent anywhere by the site itself.
+ */
+function shareButton(title: string, url: string): HTMLButtonElement {
+  const ico = h('span', { class: 'act-ico' }, icon('share', 16));
+  const text = h('span', { class: 'act-text' }, 'Share');
+  const btn = h('button', { type: 'button', class: 'act act-share', title: 'Share this page', 'aria-label': `Share “${title}”` }, ico, text);
+  let timer = 0;
+  btn.addEventListener('click', async () => {
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title, url });
+        return;
+      } catch (e) {
+        if ((e as DOMException).name === 'AbortError') return; // closed the sheet
+      }
+    }
+    const ok = await copyToClipboard(url);
+    ico.replaceChildren(icon(ok ? 'check' : 'x', 16));
+    text.textContent = ok ? 'Link copied' : 'Copy failed';
+    btn.classList.toggle('done', ok);
+    btn.classList.toggle('fail', !ok);
+    announce(ok ? 'Link copied' : 'Copy failed');
+    clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      ico.replaceChildren(icon('share', 16));
+      text.textContent = 'Share';
+      btn.classList.remove('done', 'fail');
+    }, 1500);
+  });
+  return btn;
 }
 
 function infoButton(row: Row): HTMLAnchorElement {
@@ -908,7 +943,7 @@ async function renderTune(id: number, signal: AbortSignal) {
       h('p', { class: 'kind' }, 'Tune'),
       h('h1', { class: 'at' }, text),
       h('dl', {}, ...rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, ...v)])),
-      h('p', { class: 'acts acts-lg' }, ...rowActions(t, { info: false })),
+      h('p', { class: 'acts acts-lg' }, ...rowActions(t, { info: false }), shareButton(text, ORIGIN + tunePath(t))),
       h('p', { class: 'muted' },
         'Source: ',
         external(t.riddim?.url ?? null, `${t.riddim?.name ?? 'Riddim'} on Riddim-ID ↗`) ?? external('https://riddim-id.com/', 'Riddim-ID ↗'),

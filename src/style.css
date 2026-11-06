@@ -309,7 +309,7 @@ p.state[role="status"] { flex-direction: row; align-items: center; gap: 8px; }
 .tune dl { display: grid; grid-template-columns: max-content 1fr; margin: 16px 0; border-top: 1px solid var(--line); }
 .tune dt, .tune dd { padding: 9px 0; border-bottom: 1px solid var(--line); margin: 0; }
 .tune dt { color: var(--fg-2); padding-right: 24px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; align-self: stretch; display: flex; align-items: center; }
-.acts-lg { display: flex; justify-content: flex-start; gap: 6px; margin: 0 0 12px; }
+.acts-lg { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 6px; margin: 0 0 12px; }
 .acts-lg .act { height: 38px; min-width: 38px; font-size: 14px; border-color: var(--line-strong); background: var(--surface-2); }
 .acts-lg .act:not(.act-yt) { width: auto; padding: 0 12px 0 10px; }
 .acts-lg .act-text-wide { display: inline; }
@@ -422,6 +422,10 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 /* copy feedback */
 .act.act-copy.done { background: #3f8a5c; border-color: #3f8a5c; color: #fff; }
 .act.act-copy.fail { background: #a3453f; border-color: #a3453f; color: #fff; }
+/* share (tune page): neutral outline, it acts on the page rather than the tune */
+.act.act-share { min-width: 118px; } /* fits "Link copied", so width never changes */
+.act.act-share.done { background: #3f8a5c; border-color: #3f8a5c; color: #fff; }
+.act.act-share.fail { background: #a3453f; border-color: #a3453f; color: #fff; }
 
 /* ---------- cookie consent (EU/EEA, UK, CH only; see /analytics.js) ---------- */
 .consent {
