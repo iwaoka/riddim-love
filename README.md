@@ -1,6 +1,6 @@
 # RIDDIM.LOVE
 
-**Built for selectors.** A free, non-commercial, ad-free riddim search for reggae and dancehall selectors.
+**Built for selectors.** A fast riddim search for reggae and dancehall selectors.
 
 > Selectors don't need recommendations. They need information.
 
