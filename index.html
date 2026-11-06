@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RIDDIM.LOVE — Built for selectors</title>
+    <meta name="description" content="Fast riddim search for reggae and dancehall selectors. Find artist, title, riddim and label. Data provided by Riddim-ID." />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to results</a>
+    <header class="top" id="top">
+      <a class="logo" href="/" aria-label="RIDDIM.LOVE home">RIDDIM<span>.</span>LOVE</a>
+      <p class="tagline">Built for selectors.</p>
+      <form class="search" id="search-form" role="search" action="/" method="get">
+        <label class="sr-only" for="q">Search artist, title, riddim or label</label>
+        <input id="q" name="q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false"
+          minlength="2" maxlength="100" placeholder="Artist, title, riddim or label" enterkeyhint="search" />
+        <button type="submit">Search</button>
+      </form>
+      <p class="hint" id="hint">Type and press <kbd>Enter</kbd>. Press <kbd>/</kbd> to jump to search. Typos are OK.</p>
+      <fieldset class="yt-opts" id="yt-opts">
+        <legend>YouTube search adds</legend>
+        <label><input type="checkbox" id="yt-riddim" /> Riddim</label>
+        <label><input type="checkbox" id="yt-label" /> Label</label>
+      </fieldset>
+    </header>
+    <main id="main" tabindex="-1"></main>
+    <div class="sr-only" id="announce" aria-live="polite"></div>
+    <footer class="foot">
+      <p>Data provided by <a href="https://riddim-id.com/" rel="noopener">Riddim-ID</a>.
+        An independent, non-commercial project built for reggae selectors — not affiliated with Riddim-ID.</p>
+      <p>No ads. No accounts. No recommendations. <span class="tag">Built for selectors.</span></p>
+    </footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

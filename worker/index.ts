@@ -1,0 +1,224 @@
+// RIDDIM.LOVE Worker: serves the static app and a small, whitelisted
+// read-only relay to the Riddim-ID API v1 (https://api.riddim-id.com/docs).
+
+import type { ApiError, SearchResult, TuneList } from '../shared/types';
+import * as P from './project';
+import {
+  BadRequest,
+  onlyParams,
+  parseCursor,
+  parseEnum,
+  parseId,
+  parseQuery,
+  RIDDIM_TUNE_SORTS,
+  TUNE_SORTS,
+} from './validate';
+
+export interface Env {
+  ASSETS: Fetcher;
+}
+
+const UPSTREAM = 'https://api.riddim-id.com/v1';
+const USER_AGENT = 'RIDDIM.LOVE/0.1 (+https://riddim.love; independent non-commercial search frontend)';
+const UPSTREAM_TIMEOUT_MS = 10_000;
+const DEFAULT_TTL = 300;
+const NAME_LIMIT = 20;
+const TUNE_LIMIT = 50;
+
+/** Set when upstream answers 429; requests are refused locally until then. */
+let cooldownUntil = 0;
+
+class UpstreamError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+    readonly retryAfter?: number,
+  ) {
+    super(message);
+  }
+}
+
+function ttlFrom(cacheControl: string | null): number {
+  const m = /s-maxage=(\d+)/.exec(cacheControl ?? '') ?? /max-age=(\d+)/.exec(cacheControl ?? '');
+  const n = m ? Number(m[1]) : DEFAULT_TTL;
+  return Math.min(Math.max(n, 60), 86_400);
+}
+
+/** GET an upstream path, through the Cloudflare edge cache. Returns parsed JSON. */
+async function upstream(path: string, params: Record<string, string | number | null>, ctx: ExecutionContext): Promise<unknown> {
+  const url = new URL(UPSTREAM + path);
+  for (const [k, v] of Object.entries(params).sort(([a], [b]) => a.localeCompare(b))) {
+    if (v !== null && v !== '') url.searchParams.set(k, String(v));
+  }
+  const cacheKey = new Request(url.toString(), { method: 'GET' });
+  const cache = caches.default;
+
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit.json();
+
+  const now = Date.now();
+  if (now < cooldownUntil) {
+    const wait = Math.ceil((cooldownUntil - now) / 1000);
+    throw new UpstreamError(429, 'rate_limited', 'Riddim-ID is rate limiting requests. Please try again shortly.', wait);
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      headers: { Accept: 'application/json', 'User-Agent': USER_AGENT },
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
+  } catch {
+    throw new UpstreamError(502, 'upstream_unreachable', 'Could not reach Riddim-ID. Please try again.');
+  }
+
+  if (res.status === 429) {
+    const ra = Number(res.headers.get('Retry-After')) || 60;
+    cooldownUntil = Date.now() + ra * 1000;
+    throw new UpstreamError(429, 'rate_limited', 'Riddim-ID is rate limiting requests. Please try again shortly.', ra);
+  }
+  if (res.status === 404) throw new UpstreamError(404, 'not_found', 'Not found on Riddim-ID.');
+  if (res.status === 422) throw new UpstreamError(400, 'invalid_request', 'Riddim-ID rejected the request.');
+  if (!res.ok) throw new UpstreamError(502, 'upstream_error', `Riddim-ID returned an error (${res.status}).`);
+
+  const text = await res.text();
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw new UpstreamError(502, 'upstream_error', 'Riddim-ID returned an unexpected response.');
+  }
+
+  const ttl = ttlFrom(res.headers.get('Cache-Control'));
+  const toCache = new Response(text, {
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${ttl}` },
+  });
+  ctx.waitUntil(cache.put(cacheKey, toCache));
+  return body;
+}
+
+const data = (body: unknown): unknown => (body && typeof body === 'object' ? (body as { data?: unknown }).data : undefined);
+
+function tuneList(body: unknown): TuneList {
+  const meta = (body as { meta?: { total?: unknown; next_cursor?: unknown } })?.meta ?? {};
+  return {
+    tunes: P.tunes(data(body)),
+    total: typeof meta.total === 'number' ? meta.total : null,
+    next_cursor: typeof meta.next_cursor === 'string' ? meta.next_cursor : null,
+  };
+}
+
+const SECURITY_HEADERS: Record<string, string> = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+};
+
+function json(body: unknown, status = 200, extra: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': status === 200 ? 'public, max-age=60' : 'no-store',
+      ...SECURITY_HEADERS,
+      ...extra,
+    },
+  });
+}
+
+function errorResponse(status: number, code: string, message: string, retryAfter?: number): Response {
+  const body: ApiError = { error: { code, message, ...(retryAfter ? { retry_after: retryAfter } : {}) } };
+  return json(body, status, retryAfter ? { 'Retry-After': String(retryAfter) } : {});
+}
+
+async function handleApi(url: URL, ctx: ExecutionContext): Promise<Response> {
+  const p = url.searchParams;
+  const path = url.pathname.replace(/\/+$/, '');
+  let m: RegExpExecArray | null;
+
+  if (path === '/api/search') {
+    onlyParams(p, ['q']);
+    const q = parseQuery(p.get('q'));
+    const [names, tunes] = await Promise.all([
+      upstream('/search', { q, types: 'riddim,artist,producer,label', limit: NAME_LIMIT }, ctx),
+      upstream('/search', { q, types: 'tune', limit: TUNE_LIMIT }, ctx),
+    ]);
+    const asArray = (b: unknown) => (Array.isArray(data(b)) ? (data(b) as unknown[]) : []);
+    const result: SearchResult = {
+      query: q,
+      names: asArray(names).map(P.nameHit).filter((x) => x !== null),
+      tunes: asArray(tunes).map(P.tuneHit).filter((x) => x !== null),
+      limit: TUNE_LIMIT,
+    };
+    return json(result);
+  }
+
+  if ((m = /^\/api\/riddims\/([^/]+)$/.exec(path))) {
+    onlyParams(p, []);
+    const id = parseId(m[1]);
+    const r = P.riddim(data(await upstream(`/riddims/${id}`, {}, ctx)));
+    if (!r) throw new UpstreamError(502, 'upstream_error', 'Riddim-ID returned an unexpected response.');
+    return json(r);
+  }
+
+  if ((m = /^\/api\/riddims\/([^/]+)\/tunes$/.exec(path))) {
+    onlyParams(p, ['cursor', 'sort', 'q', 'versions']);
+    const id = parseId(m[1]);
+    const q = p.get('q') ? parseQuery(p.get('q'), { min: 1, max: 100 }) : null;
+    const body = await upstream(
+      `/riddims/${id}/tunes`,
+      {
+        cursor: parseCursor(p.get('cursor')),
+        sort: parseEnum(p.get('sort'), RIDDIM_TUNE_SORTS),
+        q,
+        versions: parseEnum(p.get('versions'), ['include'] as const),
+      },
+      ctx,
+    );
+    return json(tuneList(body));
+  }
+
+  if ((m = /^\/api\/(artists|producers|labels)\/([^/]+)\/tunes$/.exec(path))) {
+    onlyParams(p, ['cursor', 'sort']);
+    const id = parseId(m[2]);
+    const body = await upstream(
+      `/${m[1]}/${id}/tunes`,
+      { cursor: parseCursor(p.get('cursor')), sort: parseEnum(p.get('sort'), TUNE_SORTS) },
+      ctx,
+    );
+    return json(tuneList(body));
+  }
+
+  if ((m = /^\/api\/tunes\/([^/]+)$/.exec(path))) {
+    onlyParams(p, []);
+    const id = parseId(m[1]);
+    const t = P.tune(data(await upstream(`/tunes/${id}`, {}, ctx)));
+    if (!t) throw new UpstreamError(502, 'upstream_error', 'Riddim-ID returned an unexpected response.');
+    return json(t);
+  }
+
+  return errorResponse(404, 'not_found', 'Unknown API route.');
+}
+
+export default {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+    if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      return errorResponse(405, 'method_not_allowed', 'Only GET is allowed.');
+    }
+    let res: Response;
+    try {
+      res = await handleApi(url, ctx);
+    } catch (e) {
+      if (e instanceof BadRequest) res = errorResponse(400, 'invalid_request', e.message);
+      else if (e instanceof UpstreamError) res = errorResponse(e.status, e.code, e.message, e.retryAfter);
+      else {
+        console.error(e);
+        res = errorResponse(500, 'internal_error', 'Something went wrong.');
+      }
+    }
+    return request.method === 'HEAD' ? new Response(null, res) : res;
+  },
+} satisfies ExportedHandler<Env>;
