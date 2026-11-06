@@ -223,9 +223,18 @@ export async function servePage(
   page: { kind: PageKind; id: number; slug: string },
 ): Promise<Response> {
   const started = Date.now();
+  // The app shell (index.html) of *this* build. Its ETag changes with every
+  // deploy (new asset hashes), so it is part of the HTML cache key: a page
+  // rendered by an older build — pointing at /assets/* files that no longer
+  // exist — is never served after a deploy.
+  const template = await asset(env, url, '/');
+  const shell = await template.clone().text();
+  // Hashed asset names (JS + CSS) identify the build; either changing must miss the cache.
+  const hashes = [...shell.matchAll(/\/assets\/[A-Za-z0-9_.-]*?-([A-Za-z0-9_-]{6,})\.(?:js|css)/g)].map((m) => m[1]);
+  const build = (hashes.length ? hashes.join('.') : (template.headers.get('ETag') ?? 'none')).replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 80);
   // Rendered HTML is kept briefly at the edge (shorter than the upstream data
   // TTL, so no data outlives Riddim-ID's own cache window by much).
-  const htmlKey = new Request(`${ORIGIN}/__internal/html${url.pathname}${url.search}`);
+  const htmlKey = new Request(`${ORIGIN}/__internal/html/${build}${url.pathname}${url.search}`);
   const cachedHtml = await caches.default.match(htmlKey);
   if (cachedHtml) {
     const res = new Response(cachedHtml.body, cachedHtml);
@@ -260,7 +269,6 @@ export async function servePage(
   const canonical = ORIGIN + built.canonicalPath;
   const { meta } = built;
   const noindex = !INDEXABLE[page.kind];
-  const template = await asset(env, url, '/');
   const setContent = (content: string) => ({
     element(el: Element) {
       el.setAttribute('content', content);

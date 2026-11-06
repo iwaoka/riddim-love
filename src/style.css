@@ -336,10 +336,16 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 
   /* header row becomes a strip of sort buttons */
   .tunes thead { display: block; background: var(--head); border-bottom: 1px solid var(--line-strong); }
-  .tunes thead tr { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
-  .tunes thead th { display: block; padding: 0; border: 0; width: auto !important; background: transparent !important; }
+  /* one row of compact sort chips; on very narrow screens it scrolls sideways instead of wrapping */
+  .tunes thead tr {
+    display: flex; flex-wrap: nowrap; gap: 4px; padding: 8px 8px;
+    overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .tunes thead tr::-webkit-scrollbar { display: none; }
+  .tunes thead th { display: block; flex: none; padding: 0; border: 0; width: auto !important; background: transparent !important; font-size: 11.5px; letter-spacing: 0.02em; }
   .tunes thead th.c-act { position: absolute; width: 1px !important; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  .tunes thead .sort-btn { border: 1px solid var(--line-strong); border-radius: 99px; padding: 6px 12px; min-height: 34px; background: var(--surface); }
+  .tunes thead .sort-btn { border: 1px solid var(--line-strong); border-radius: 99px; padding: 0 7px; min-height: 34px; background: var(--surface); white-space: nowrap; gap: 2px; }
+  .tunes thead .sort-ind:empty { display: none; } /* only the active chip spends width on ▲/▼ */
   .tunes thead th[aria-sort="ascending"] .sort-btn, .tunes thead th[aria-sort="descending"] .sort-btn { border-color: var(--accent); color: var(--fg); background: var(--accent-soft); }
 
   /* table → stacked rows (nothing truncated; long names wrap):
@@ -355,13 +361,13 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
   }
   .tunes tbody tr:last-child { border-bottom: 0; }
   .tunes td, .tunes td:first-child { display: block; padding: 0; border: 0 !important; width: auto !important; text-align: left !important; overflow-wrap: anywhere; }
-  .tunes .c-artist { grid-area: artist; font-size: 16px; line-height: 1.3; }
-  .tunes .c-title { grid-area: title; font-size: 14px; line-height: 1.35; margin-top: 2px; }
-  .tunes .c-riddim { grid-area: riddim; }
-  .tunes .c-year { grid-area: year; }
-  .tunes .c-label { grid-area: label; }
+  .tunes td.c-artist { grid-area: artist; font-size: 16px; line-height: 1.3; }
+  .tunes td.c-title { grid-area: title; font-size: 14px; line-height: 1.35; margin-top: 2px; }
+  .tunes td.c-riddim { grid-area: riddim; }
+  .tunes td.c-year { grid-area: year; }
+  .tunes td.c-label { grid-area: label; }
   .tunes td.c-act { grid-area: act; justify-self: end; align-self: center; display: block; padding: 0; margin-top: 6px; }
-  .tunes .c-riddim, .tunes .c-label, .tunes .c-year { font-size: 13px; line-height: 1.35; color: var(--fg-2); margin-top: 3px; }
+  .tunes td.c-riddim, .tunes td.c-label, .tunes td.c-year { font-size: 13px; line-height: 1.35; color: var(--fg-2); margin-top: 3px; }
   .tunes td.c-year:empty { display: none; }
   .tunes tbody tr.orig td:first-child { box-shadow: none; }
   .tunes tbody tr.orig { box-shadow: inset 3px 0 0 var(--accent); }
