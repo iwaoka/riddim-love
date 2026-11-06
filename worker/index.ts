@@ -2,6 +2,7 @@
 // a daily sitemap, and a small, whitelisted read-only relay to the Riddim-ID
 // API v1 (https://api.riddim-id.com/docs).
 
+import { normalizeCountry, type CountryCode } from '../shared/dig';
 import { ORIGIN, PAGE_KINDS, pagePath, parsePagePath, type PageKind } from '../shared/seo';
 import type { ApiError, SearchResult } from '../shared/types';
 import { loadEntity, loadRiddim, loadTune, loadTunes } from './data';
@@ -23,6 +24,8 @@ import {
 
 export interface Env {
   ASSETS: Fetcher;
+  /** "1" only in local dev (.dev.vars): allows ?country=XX for testing the Dig menu. */
+  DEV_COUNTRY_OVERRIDE?: string;
 }
 
 const SEARCH_LIMIT = 50; // upstream maximum
@@ -133,22 +136,40 @@ const LIST_PARAMS = ['f', 'sort', 'versions'];
 const CONSENT_COUNTRIES = new Set(['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'IS', 'LI', 'NO', 'GB', 'CH']);
 
 /**
- * Marks HTML for visitors who must be asked before analytics runs. Applied to
- * the final response (after any HTML cache), so cached pages stay shared.
+ * The visitor's country (ISO 3166-1 alpha-2) from Cloudflare — no IP lookup,
+ * nothing stored. In `wrangler dev` only (DEV_COUNTRY_OVERRIDE=1 in .dev.vars),
+ * `?country=US` / `?country=none` overrides it for testing.
  */
-function markConsent(request: Request, res: Response): Response {
-  const country = (request.cf as { country?: string } | undefined)?.country ?? '';
-  if (!CONSENT_COUNTRIES.has(country)) return res;
+function visitorCountry(request: Request, url: URL, env: Env): CountryCode {
+  if (env.DEV_COUNTRY_OVERRIDE === '1' && url.searchParams.has('country')) return normalizeCountry(url.searchParams.get('country'));
+  return normalizeCountry((request.cf as { country?: string } | undefined)?.country);
+}
+
+/**
+ * Stamps per-visitor facts onto an HTML response: <html data-country="JP">
+ * (used by the Dig menu) and data-consent="required" for EU/EEA, UK, CH
+ * (analytics consent). Applied to the final response, after any HTML cache,
+ * so cached pages stay country-neutral; the result is marked private so no
+ * shared cache can hand one country's page to another.
+ */
+function markVisitor(request: Request, url: URL, env: Env, res: Response): Response {
   if (!(res.headers.get('Content-Type') ?? '').includes('text/html')) return res;
+  const country = visitorCountry(request, url, env);
   const out = new HTMLRewriter()
     .on('html', {
       element(el) {
-        el.setAttribute('data-consent', 'required');
+        if (country) el.setAttribute('data-country', country);
+        if (country && CONSENT_COUNTRIES.has(country)) el.setAttribute('data-consent', 'required');
       },
     })
     .transform(res);
   const marked = new Response(out.body, out);
+  marked.headers.set('Cache-Control', 'private, no-cache');
   marked.headers.append('Vary', 'CF-IPCountry');
+  // The body now depends on the visitor; an asset ETag would let a browser
+  // revalidate to a copy stamped for another country (e.g. after travelling).
+  marked.headers.delete('ETag');
+  marked.headers.delete('Last-Modified');
   return marked;
 }
 
@@ -191,10 +212,10 @@ export default {
       if (!isRead) return env.ASSETS.fetch(request);
       const redirect = canonicalRedirect(request, url);
       if (redirect) return redirect;
-      if (url.pathname === '/') return markConsent(request, await serveShell(env, url, request));
+      if (url.pathname === "/") return markVisitor(request, url, env, await serveShell(env, url, request));
       if (url.pathname === '/sitemap.xml') return serveSitemap(ctx);
       const page = parsePagePath(url.pathname);
-      if (page) return markConsent(request, await servePage(request, env, ctx, url, page));
+      if (page) return markVisitor(request, url, env, await servePage(request, env, ctx, url, page));
       return env.ASSETS.fetch(request);
     }
 

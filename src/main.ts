@@ -1,5 +1,6 @@
 import './style.css';
-import { copyText, DIG_SEARCHES, displayText, externalSearchUrl, searchText } from '../shared/format';
+import { digProvidersFor, normalizeCountry } from '../shared/dig';
+import { copyText, displayText, externalSearchUrl, searchText } from '../shared/format';
 import { labelMeta, ORIGIN, parsePagePath, personMeta, refPath, riddimMeta, tuneMeta, tunePath, type PageMeta } from '../shared/seo';
 import { sortRows, type SortDir, type SortKey } from '../shared/sort';
 
@@ -327,6 +328,11 @@ function infoButton(row: Row): HTMLAnchorElement {
 // ---------- Dig: one shared popover menu for every row ----------
 // Built lazily, positioned with fixed coordinates (no layout shift), filled
 // only when opened; links are plain search URLs made in the browser.
+/** Visitor country stamped on <html data-country> by the Worker (no request); null if unknown. Read once. */
+const visitorCountry = normalizeCountry(document.documentElement.dataset.country);
+/** Dig providers for this visitor, resolved once per page load. */
+const digProviders = digProvidersFor(visitorCountry);
+
 let digMenu: HTMLDivElement | null = null;
 let digOwner: HTMLButtonElement | null = null;
 
@@ -402,14 +408,14 @@ function openDig(btn: HTMLButtonElement, row: Pick<Row, 'artists' | 'title'>, fo
   const query = searchText(row.artists, row.title);
   menu.replaceChildren(
     h('p', { class: 'dig-head', 'aria-hidden': 'true' }, query),
-    ...DIG_SEARCHES.map((s) =>
+    ...digProviders.map((s) =>
       h('a', {
         role: 'menuitem',
-        href: s.url(query),
+        href: s.buildSearchUrl(query),
         target: '_blank',
         rel: 'noopener noreferrer',
         title: `Search ${s.name} for “${query}” (opens in a new tab)`,
-      }, h('span', { class: 'dig-name' }, s.name), h('span', { class: 'dig-host', 'aria-hidden': 'true' }, new URL(s.url('')).hostname.replace(/^www\./, ''))),
+      }, h('span', { class: 'dig-name' }, s.name), h('span', { class: 'dig-host', 'aria-hidden': 'true' }, new URL(s.buildSearchUrl('')).hostname.replace(/^www\./, ''))),
     ),
   );
   menu.hidden = false;
