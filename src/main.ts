@@ -1000,7 +1000,9 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
     filter.blur(); // filtering is live; Enter just closes the keyboard
   });
 
-  // ---- the whole list: first page now, the rest only when sorting / filtering needs it
+  // ---- the whole list: first page painted at once, the rest loaded right
+  // after in the background (upstream pages are 100 tunes; the Worker caches
+  // each page for 5 minutes, so a popular list costs Riddim-ID little)
   const CAP = 1500; // largest riddim ~520 tunes; covers nearly every label too
   const count = h('p', { class: 'count muted', role: 'status' });
   const more = h('button', { type: 'button', class: 'more' }, 'Load more');
@@ -1021,7 +1023,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
   }
 
   /** Loads the remaining pages (up to CAP) in the background; idempotent. */
-  function loadAll() {
+  function loadAll(quiet = false) {
     if (bulk || !cursor || held >= CAP) return;
     failed = false;
     bulk = (async () => {
@@ -1037,7 +1039,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
         bulk = null;
         if (!signal.aborted) {
           setCount();
-          announce(failed ? 'Could not load every tune' : `All ${held} tunes loaded`);
+          if (failed || !quiet) announce(failed ? 'Could not load every tune' : `All ${held} tunes loaded`);
         }
       }
     })();
@@ -1056,7 +1058,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
     else if (failed) parts.push('could not load every tune — try again');
     else if (cursor && held >= CAP) parts.push(`showing the first ${CAP.toLocaleString('en')}`);
     count.textContent = parts.join(' · ');
-    // "Load more" is only for plain browsing; sorting / filtering loads everything.
+    // Everything loads on its own; "Load more" is left as the retry after a failure.
     more.hidden = !cursor || held >= CAP || !!bulk || !!active || !!q;
   };
 
@@ -1111,6 +1113,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
 
   main.replaceChildren(head, controls, count, list.tunes.length ? table.el : h('p', { class: 'state' }, 'No tunes listed.'), more);
   announce(`${name}: ${count.textContent}`);
+  loadAll(true);
 }
 
 function joinLinks(refs: Ref[], kind: ListKind): (Node | string)[] {
