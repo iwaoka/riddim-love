@@ -185,6 +185,17 @@ function external(url: string | null, text: string, cls = ''): HTMLElement | nul
   return safe ? h('a', { href: safe, target: '_blank', rel: 'noopener noreferrer', class: cls || null }, text) : null;
 }
 
+/**
+ * Page head's first line: the kind chip, and the Riddim-ID source link set
+ * small at the right — credited on every page, out of the reading path.
+ */
+function headTop(kind: string, sourceUrl: string | null): HTMLElement {
+  return h('div', { class: 'head-top' },
+    h('p', { class: 'kind' }, kind),
+    external(sourceUrl, 'View on Riddim-ID ↗', 'src'),
+  );
+}
+
 /** Detail-page path for a riddim / artist / producer / label reference (slug from its riddim-id.com URL). */
 const listHref = (kind: ListKind, ref: Pick<Ref, 'id' | 'url'>) => refPath(kind, ref);
 
@@ -956,7 +967,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
   input.value = '';
 
   const head = h('header', { class: 'list-head' },
-    h('p', { class: 'kind' }, KIND_LABEL[kind]),
+    headTop(KIND_LABEL[kind], ref?.url ?? null),
     h('h1', {}, pm.h1),
   );
   if (riddim) {
@@ -975,8 +986,6 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
       );
     }
   }
-  const src = external(ref?.url ?? null, 'View on Riddim-ID ↗', 'src');
-  if (src) head.appendChild(h('p', {}, src));
 
   // ---- controls: live filter (Artist / Title / Label)
   const controls = h('form', { class: 'controls', role: 'search', 'aria-label': 'Filter this list' });
@@ -1131,16 +1140,12 @@ async function renderTune(id: number, signal: AbortSignal) {
   ];
   main.replaceChildren(
     h('article', { class: 'tune' },
-      h('p', { class: 'kind' }, 'Tune'),
+      headTop('Tune', t.riddim?.url ?? 'https://riddim-id.com/'),
       h('h1', { class: 'at' }, text),
       h('dl', {}, ...rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, ...v)])),
       // Dig is laid out open here (no menu to open): one click to a shop.
       h('p', { class: 'acts acts-lg' }, youtubeButton(t), copyButton(copyText(t.artists, t.title)), shareButton(text, ORIGIN + tunePath(t))),
       digLinks(t),
-      h('p', { class: 'muted' },
-        'Source: ',
-        external(t.riddim?.url ?? null, `${t.riddim?.name ?? 'Riddim'} on Riddim-ID ↗`) ?? external('https://riddim-id.com/', 'Riddim-ID ↗'),
-      ),
     ),
   );
 }

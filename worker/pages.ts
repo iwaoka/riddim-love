@@ -38,8 +38,8 @@ const LS = new RegExp(String.fromCharCode(0x2028), "g");
 const PS = new RegExp(String.fromCharCode(0x2029), "g");
 const scriptJson = (v: unknown) => JSON.stringify(v).replace(/</g, "\\u003c").replace(LS, "\\u2028").replace(PS, "\\u2029");
 const a = (href: string, text: string) => `<a href="${esc(href)}">${esc(text)}</a>`;
-const ext = (href: string | null, text: string) =>
-  href && href.startsWith('https://riddim-id.com/') ? `<a href="${esc(href)}" rel="noopener" target="_blank">${esc(text)}</a>` : '';
+const ext = (href: string | null, text: string, cls = '') =>
+  href && href.startsWith('https://riddim-id.com/') ? `<a href="${esc(href)}"${cls ? ` class="${cls}"` : ''} rel="noopener" target="_blank">${esc(text)}</a>` : '';
 const joinRefs = (refs: Ref[], kind: 'artist' | 'producer') => refs.map((r) => a(refPath(kind, r), r.name)).join(' &amp; ');
 const yearSpan = (y: number | null) => (y ? ` <span class="muted">${y}</span>` : '');
 
@@ -71,13 +71,12 @@ function countLine(list: TuneList): string {
 
 const KIND_LABEL: Record<PageKind, string> = { riddim: 'Riddim', artist: 'Artist', producer: 'Producer', label: 'Label', tune: 'Tune' };
 
+/** Kind chip + the Riddim-ID source link, small at the right (same as the app). */
+const headTop = (kind: PageKind, src: string | null) =>
+  `<div class="head-top"><p class="kind">${KIND_LABEL[kind]}</p>${src ? ext(src, 'View on Riddim-ID ↗', 'src') : ''}</div>`;
+
 function listHead(kind: ListKind, meta: PageMeta, extra: string[], src: string | null): string {
-  return (
-    `<header class="list-head"><p class="kind">${KIND_LABEL[kind]}</p><h1>${esc(meta.h1)}</h1>` +
-    extra.filter(Boolean).join('') +
-    (src ? `<p class="src">${ext(src, 'View on Riddim-ID ↗')}</p>` : '') +
-    `</header>`
-  );
+  return `<header class="list-head">${headTop(kind, src)}<h1>${esc(meta.h1)}</h1>` + extra.filter(Boolean).join('') + `</header>`;
 }
 
 // ---------- JSON-LD (only what the page shows) ----------
@@ -167,7 +166,7 @@ async function buildTune(id: number, ctx: ExecutionContext, stats: UpstreamStats
   const url = ORIGIN + canonicalPath;
   const dd = (k: string, v: string) => `<dt>${k}</dt><dd>${v || '—'}</dd>`;
   const main =
-    `<article class="tune"><p class="kind">Tune</p><h1 class="at">${esc(displayText(t.artists, t.title))}</h1><dl>` +
+    `<article class="tune">${headTop('tune', t.riddim?.url ?? 'https://riddim-id.com/')}<h1 class="at">${esc(displayText(t.artists, t.title))}</h1><dl>` +
     dd('Artist', joinRefs(t.artists, 'artist')) +
     dd('Title', esc(t.title) + (t.is_original ? ' <span class="badge">Original</span>' : '')) +
     dd('Riddim', t.riddim ? a(refPath('riddim', t.riddim), t.riddim.name) + (t.riddim.version_of ? ` <span class="muted">(version of ${esc(t.riddim.version_of)})</span>` : '') : '') +
@@ -175,7 +174,6 @@ async function buildTune(id: number, ctx: ExecutionContext, stats: UpstreamStats
     dd('Producer', joinRefs(t.producers, 'producer')) +
     dd('Year', t.year ? String(t.year) : '') +
     `</dl>` +
-    (t.riddim?.url ? `<p class="muted">Source: ${ext(t.riddim.url, `${t.riddim.name} on Riddim-ID ↗`)}</p>` : '') +
     `</article>`;
   const trail = t.riddim ? [{ name: riddimName(t.riddim.name), url: ORIGIN + refPath('riddim', t.riddim) }] : [];
   return {
