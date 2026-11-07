@@ -500,3 +500,8 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 }
 .no-match .chip:hover, .no-match .retry:hover { border-color: var(--accent); color: var(--accent); }
 .no-match .chip:focus-visible, .no-match .retry:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* tune page: Dig shops laid out open (no menu) */
+.dig-open { margin: 0 0 12px; }
+.dig-open-head { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--fg-2); }
+.dig-open .acts-lg { margin: 0; }

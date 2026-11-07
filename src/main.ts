@@ -446,6 +446,25 @@ function openDig(btn: HTMLButtonElement, row: Pick<Row, 'artists' | 'title'>, fo
   if (focusFirst) menu.querySelector<HTMLAnchorElement>('[role="menuitem"]')?.focus();
 }
 
+/** The Dig shops as plain links (tune page): same providers and query as the menu. */
+function digLinks(row: Pick<Row, 'artists' | 'title'>): HTMLElement {
+  const query = searchText(row.artists, row.title);
+  return h('div', { class: 'dig-open', role: 'group', 'aria-label': `Dig: search record shops for “${query}”` },
+    h('p', { class: 'dig-open-head' }, icon('disc', 15), ' Dig'),
+    h('p', { class: 'acts acts-lg' },
+      ...digProviders.map((s) =>
+        h('a', {
+          class: 'act act-dig',
+          href: s.buildSearchUrl(query),
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          title: `Search ${s.name} for “${query}” (opens in a new tab)`,
+        }, h('span', { class: 'act-text' }, s.name)),
+      ),
+    ),
+  );
+}
+
 function digButton(row: Pick<Row, 'artists' | 'title'>): HTMLButtonElement {
   const query = searchText(row.artists, row.title);
   const label = `Dig: search record shops for “${query}”`;
@@ -1115,7 +1134,9 @@ async function renderTune(id: number, signal: AbortSignal) {
       h('p', { class: 'kind' }, 'Tune'),
       h('h1', { class: 'at' }, text),
       h('dl', {}, ...rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, ...v)])),
-      h('p', { class: 'acts acts-lg' }, ...rowActions(t), shareButton(text, ORIGIN + tunePath(t))),
+      // Dig is laid out open here (no menu to open): one click to a shop.
+      h('p', { class: 'acts acts-lg' }, youtubeButton(t), copyButton(copyText(t.artists, t.title)), shareButton(text, ORIGIN + tunePath(t))),
+      digLinks(t),
       h('p', { class: 'muted' },
         'Source: ',
         external(t.riddim?.url ?? null, `${t.riddim?.name ?? 'Riddim'} on Riddim-ID ↗`) ?? external('https://riddim-id.com/', 'Riddim-ID ↗'),
