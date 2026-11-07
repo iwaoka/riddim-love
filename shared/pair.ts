@@ -27,8 +27,16 @@ export function splitArtistTitle(query: string): ArtistTitle | null {
   const artist = q.slice(0, m.index).trim();
   const title = q.slice(m.index + m[0].length).trim();
   if (!artist || !title) return null;
-  const primary = artist.split(JOINS).map((s) => s.trim()).find(Boolean) ?? artist;
-  return { artist, primary, title };
+  return { artist, primary: primaryArtist(artist), title };
+}
+
+/** "Title - Artist": the same split read the other way round. */
+export function swapArtistTitle(p: ArtistTitle): ArtistTitle {
+  return { artist: p.title, primary: primaryArtist(p.title), title: p.artist };
+}
+
+function primaryArtist(artist: string): string {
+  return artist.split(JOINS).map((s) => s.trim()).find(Boolean) ?? artist;
 }
 
 /**

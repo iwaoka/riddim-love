@@ -3,7 +3,7 @@ import { digProvidersFor, normalizeCountry } from '../shared/dig';
 import { artistNames, copyText, displayText, externalSearchUrl, searchText } from '../shared/format';
 import { labelMeta, ORIGIN, parsePagePath, personMeta, refPath, riddimMeta, tuneMeta, tunePath, type PageMeta } from '../shared/seo';
 import { filterWords, matches } from '../shared/filter';
-import { sameName, splitArtistTitle, splitByArtistPrefix, splitByArtistSuffix, type ArtistTitle } from '../shared/pair';
+import { sameName, splitArtistTitle, splitByArtistPrefix, splitByArtistSuffix, swapArtistTitle, type ArtistTitle } from '../shared/pair';
 import { sortRows, type SortDir, type SortKey } from '../shared/sort';
 
 const HOME_TITLE = 'RIDDIM.LOVE — Riddim search for reggae & dancehall selectors';
@@ -861,13 +861,17 @@ function showArtistMatches(exact: NameHit[], name: string, title: string) {
 }
 
 async function artistTitleSearch(pair: ArtistTitle, signal: AbortSignal): Promise<boolean> {
-  loading(`Looking up ${pair.primary}…`);
-  const res = await api<SearchResult>('/api/search?' + new URLSearchParams({ type: 'artist', q: pair.primary }), signal);
-  if (signal.aborted) return true;
-  const exact = res.names.filter((n) => n.type === 'artist' && (sameName(pair.primary, n.name) || sameName(pair.primary, n.matched_name)));
-  if (exact.length) {
-    showArtistMatches(exact, pair.primary, pair.title);
-    return true;
+  // "Artist - Title" first, then the other way round ("Title - Artist"):
+  // one artist lookup each, the second only when the first finds no name.
+  for (const p of [pair, swapArtistTitle(pair)]) {
+    loading(`Looking up ${p.primary}…`);
+    const res = await api<SearchResult>('/api/search?' + new URLSearchParams({ type: 'artist', q: p.primary }), signal);
+    if (signal.aborted) return true;
+    const exact = res.names.filter((n) => n.type === 'artist' && (sameName(p.primary, n.name) || sameName(p.primary, n.matched_name)));
+    if (exact.length) {
+      showArtistMatches(exact, p.primary, p.title);
+      return true;
+    }
   }
 
   // No artist by that name: search the title part, keep hits by that artist.

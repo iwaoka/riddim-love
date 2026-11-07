@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sameName, splitArtistTitle, splitByArtistPrefix, splitByArtistSuffix } from '../shared/pair';
+import { sameName, splitArtistTitle, splitByArtistPrefix, splitByArtistSuffix, swapArtistTitle } from '../shared/pair';
 
 describe('splitArtistTitle', () => {
   it('splits the Copy format', () => {
@@ -62,5 +62,13 @@ describe('splitByArtistSuffix', () => {
     expect(splitByArtistSuffix('Luciano', hits)).toBeNull();
     expect(splitByArtistSuffix('Ring The Alarm Tenor Saws', hits)).toBeNull();
     expect(splitByArtistSuffix('Luciano If You Are Not', hits)).toBeNull();
+  });
+});
+
+describe('swapArtistTitle', () => {
+  it('reads "Title - Artist" the other way round', () => {
+    const p = splitArtistTitle('If You Are Not - Luciano')!;
+    expect(swapArtistTitle(p)).toEqual({ artist: 'Luciano', primary: 'Luciano', title: 'If You Are Not' });
+    expect(swapArtistTitle(splitArtistTitle('Ring The Alarm Quick - Tenor Saw & Buju Banton')!).primary).toBe('Tenor Saw');
   });
 });
