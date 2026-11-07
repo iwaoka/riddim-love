@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sameName, splitArtistTitle, splitByArtistPrefix } from '../shared/pair';
+import { sameName, splitArtistTitle, splitByArtistPrefix, splitByArtistSuffix } from '../shared/pair';
 
 describe('splitArtistTitle', () => {
   it('splits the Copy format', () => {
@@ -49,5 +49,18 @@ describe('splitByArtistPrefix', () => {
     expect(splitByArtistPrefix('Tenor Saw', hits)).toEqual({ name: 'Tenor', title: 'Saw' }); // then filtered on that page
     expect(splitByArtistPrefix('Super Cat', [{ name: 'Super Cat' }])).toBeNull();
     expect(splitByArtistPrefix('Ring The Alarm Tenor Saw', hits)).toBeNull();
+  });
+});
+
+describe('splitByArtistSuffix', () => {
+  const hits = [{ name: 'Saw' }, { name: 'Tenor Saw' }, { name: 'Junior Saw' }, { name: 'Luciano' }];
+  it('takes the longest artist name the query ends with', () => {
+    expect(splitByArtistSuffix('If You Are Not Luciano', hits)).toEqual({ name: 'Luciano', title: 'If You Are Not' });
+    expect(splitByArtistSuffix('Ring The Alarm Tenor Saw', hits)).toEqual({ name: 'Tenor Saw', title: 'Ring The Alarm' });
+  });
+  it('needs a whole-word suffix and a title left over', () => {
+    expect(splitByArtistSuffix('Luciano', hits)).toBeNull();
+    expect(splitByArtistSuffix('Ring The Alarm Tenor Saws', hits)).toBeNull();
+    expect(splitByArtistSuffix('Luciano If You Are Not', hits)).toBeNull();
   });
 });

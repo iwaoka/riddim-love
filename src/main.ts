@@ -3,7 +3,7 @@ import { digProvidersFor, normalizeCountry } from '../shared/dig';
 import { artistNames, copyText, displayText, externalSearchUrl, searchText } from '../shared/format';
 import { labelMeta, ORIGIN, parsePagePath, personMeta, refPath, riddimMeta, tuneMeta, tunePath, type PageMeta } from '../shared/seo';
 import { filterWords, matches } from '../shared/filter';
-import { sameName, splitArtistTitle, splitByArtistPrefix, type ArtistTitle } from '../shared/pair';
+import { sameName, splitArtistTitle, splitByArtistPrefix, splitByArtistSuffix, type ArtistTitle } from '../shared/pair';
 import { sortRows, type SortDir, type SortKey } from '../shared/sort';
 
 const HOME_TITLE = 'RIDDIM.LOVE — Riddim search for reggae & dancehall selectors';
@@ -807,9 +807,9 @@ async function renderNoMatch(q: string, type: SearchType, tip: string, signal: A
 
 /**
  * Beta: "Artist Title" with no separator, tried only after the title search
- * found nothing (one more request). The artist search on the whole query
- * ranks names by their first words, so the artist must come first:
- * "Tenor Saw Ring The Alarm" works, "Ring The Alarm Tenor Saw" does not.
+ * found nothing (one or two more requests). The artist search keys on the
+ * first words of the query, so "Artist Title" is tried first; if no name fits,
+ * the last word alone is looked up for "Title Artist" ("If You Are Not Luciano").
  * The whole query being an artist's name opens that artist's page.
  */
 async function artistPrefixSearch(q: string, signal: AbortSignal): Promise<boolean> {
@@ -822,10 +822,22 @@ async function artistPrefixSearch(q: string, signal: AbortSignal): Promise<boole
     navigate(listHref('artist', whole[0]), true);
     return true;
   }
-  const split = splitByArtistPrefix(q, hits);
+  let split = splitByArtistPrefix(q, hits);
+  let pool = hits;
+  if (!split) {
+    // "Title Artist": the artist search keys on first words, so look up the
+    // last word alone (one more request) and match names the query ends with.
+    const last = q.trim().split(/\s+/).pop()!;
+    if (last.length < 2) return false;
+    loading('Looking for an artist name…');
+    const r2 = await api<SearchResult>('/api/search?' + new URLSearchParams({ type: 'artist', q: last }), signal);
+    if (signal.aborted) return true;
+    pool = r2.names.filter((n) => n.type === 'artist');
+    split = splitByArtistSuffix(q, pool);
+  }
   if (!split) return false;
-  const exact = hits.filter((n) => sameName(split.name, n.name));
-  showArtistMatches(exact, split.name, split.title);
+  const name = split.name;
+  showArtistMatches(pool.filter((n) => sameName(name, n.name)), name, split.title);
   return true;
 }
 

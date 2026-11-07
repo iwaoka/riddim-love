@@ -41,6 +41,22 @@ export function splitByArtistPrefix(
   query: string,
   artists: readonly { name: string; matched_name?: string | null }[],
 ): { name: string; title: string } | null {
+  return splitByArtistName(query, artists, 'start');
+}
+
+/** "Title Artist": the longest artist name the query ends with; the rest is the title. */
+export function splitByArtistSuffix(
+  query: string,
+  artists: readonly { name: string; matched_name?: string | null }[],
+): { name: string; title: string } | null {
+  return splitByArtistName(query, artists, 'end');
+}
+
+function splitByArtistName(
+  query: string,
+  artists: readonly { name: string; matched_name?: string | null }[],
+  at: 'start' | 'end',
+): { name: string; title: string } | null {
   const words = query.trim().split(/\s+/);
   const folded = words.map(fold);
   let best: { name: string; title: string; n: number } | null = null;
@@ -50,8 +66,12 @@ export function splitByArtistPrefix(
       const nameWords = fold(name).split(' ').filter(Boolean);
       const n = nameWords.length;
       if (!n || n >= words.length || (best && n <= best.n)) continue;
+      const offset = at === 'start' ? 0 : words.length - n;
       // Compare word by word on folded text ("Jammy's" = "Jammys").
-      if (nameWords.every((w, i) => folded[i] === w)) best = { name: a.name, title: words.slice(n).join(' '), n };
+      if (nameWords.every((w, i) => folded[offset + i] === w)) {
+        const title = at === 'start' ? words.slice(n) : words.slice(0, words.length - n);
+        best = { name: a.name, title: title.join(' '), n };
+      }
     }
   }
   return best && { name: best.name, title: best.title };
