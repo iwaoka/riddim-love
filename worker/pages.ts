@@ -117,7 +117,7 @@ async function buildRiddim(id: number, ctx: ExecutionContext, stats: UpstreamSta
   if (r.alternate_names.length) facts.push(`<p class="facts muted">Also known as ${esc(r.alternate_names.join(', '))}</p>`);
   if (r.versions.length) {
     facts.push(
-      `<details class="versions"><summary>${r.versions.length} version${r.versions.length === 1 ? '' : 's'}</summary><ul class="chips">` +
+      `<details class="versions" open><summary>${r.versions.length} version${r.versions.length === 1 ? '' : 's'}</summary><ul class="chips">` +
         r.versions.map((v) => `<li>${a(refPath('riddim', v), v.name)}${yearSpan(v.year)}</li>`).join('') +
         `</ul></details>`,
     );

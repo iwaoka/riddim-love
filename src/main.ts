@@ -977,7 +977,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
     if (riddim.alternate_names.length) head.appendChild(h('p', { class: 'facts muted' }, 'Also known as ' + riddim.alternate_names.join(', ')));
     if (riddim.versions.length) {
       head.appendChild(
-        h('details', { class: 'versions' },
+        h('details', { class: 'versions', open: true },
           h('summary', {}, `${riddim.versions.length} version${riddim.versions.length === 1 ? '' : 's'}`),
           h('ul', { class: 'chips' },
             ...riddim.versions.map((v) => h('li', {}, link(listHref('riddim', v), v.name), v.year ? h('span', { class: 'muted' }, ` ${v.year}`) : null)),
