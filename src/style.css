@@ -303,7 +303,11 @@ p.state[role="status"] { flex-direction: row; align-items: center; gap: 8px; }
 }
 .sort-btn:hover { color: var(--fg); }
 .sort-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.sort-ind { font-size: 9px; min-width: 9px; color: var(--accent); }
+/* ▲ over ▼: both always shown faintly; the active direction in the accent colour */
+.sort-ind { display: inline-flex; flex-direction: column; font-size: 7px; line-height: 1; gap: 1px; color: var(--fg-3); opacity: 0.55; }
+th[aria-sort="ascending"] .sort-ind, th[aria-sort="descending"] .sort-ind { opacity: 1; }
+th[aria-sort="ascending"] .sort-ind .up, th[aria-sort="descending"] .sort-ind .down { color: var(--accent); }
+th[aria-sort="ascending"] .sort-ind .down, th[aria-sort="descending"] .sort-ind .up { opacity: 0.35; }
 .tunes th[aria-sort="ascending"], .tunes th[aria-sort="descending"] { color: var(--fg); background: color-mix(in srgb, var(--head) 70%, var(--accent-soft)); }
 .tunes th.c-year .sort-btn { justify-content: flex-end; }
 
@@ -356,7 +360,6 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
   .tunes thead th { display: block; flex: none; padding: 0; border: 0; width: auto !important; background: transparent !important; font-size: 11.5px; letter-spacing: 0.02em; }
   .tunes thead th.c-act { position: absolute; width: 1px !important; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .tunes thead .sort-btn { border: 1px solid var(--line-strong); border-radius: 99px; padding: 0 7px; min-height: 34px; background: var(--surface); white-space: nowrap; gap: 2px; }
-  .tunes thead .sort-ind:empty { display: none; } /* only the active chip spends width on ▲/▼ */
   .tunes thead th[aria-sort="ascending"] .sort-btn, .tunes thead th[aria-sort="descending"] .sort-btn { border-color: var(--accent); color: var(--fg); background: var(--accent-soft); }
 
   /* table → stacked rows (nothing truncated; long names wrap):

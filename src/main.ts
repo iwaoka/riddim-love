@@ -591,8 +591,6 @@ function tuneTable(
     for (const [key, th] of ths) {
       const active = sort?.key === key;
       th.setAttribute('aria-sort', active ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : 'none');
-      const ind = th.querySelector('.sort-ind') as HTMLElement;
-      ind.textContent = active ? (sort!.dir === 'asc' ? '▲' : '▼') : '';
       (th.querySelector('button') as HTMLButtonElement).title = active
         ? `Sorted by ${SORT_NAMES[key]} (${sort!.dir === 'asc' ? 'A–Z / oldest first' : 'Z–A / newest first'}). Click to reverse.`
         : `Sort by ${SORT_NAMES[key]}`;
@@ -600,7 +598,9 @@ function tuneTable(
   };
 
   const sortHead = (key: SortKey) => {
-    const btn = h('button', { type: 'button', class: 'sort-btn' }, SORT_NAMES[key], h('span', { class: 'sort-ind', 'aria-hidden': 'true' }));
+    const btn = h('button', { type: 'button', class: 'sort-btn' }, SORT_NAMES[key],
+      // ▲ over ▼ on every column; the active direction is coloured via th[aria-sort].
+      h('span', { class: 'sort-ind', 'aria-hidden': 'true' }, h('span', { class: 'up' }, '▲'), h('span', { class: 'down' }, '▼')));
     btn.addEventListener('click', () => {
       sort = sort?.key === key ? { key, dir: sort.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' };
       paint();
