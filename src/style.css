@@ -270,7 +270,7 @@ p.state[role="status"] { flex-direction: row; align-items: center; gap: 8px; }
 .tunes .rows-link tr:not(.empty) { cursor: pointer; }
 .tunes .rows-link tr:not(.empty):hover .tune-link { color: var(--accent); }
 .badge { display: inline-block; margin-left: 6px; font-size: 10.5px; font-weight: 700; padding: 0 7px; border-radius: 99px; color: var(--accent); background: var(--accent-soft); vertical-align: 1px; letter-spacing: 0.02em; }
-/* ---------- row actions: YouTube → Discogs → Info → Copy ---------- */
+/* ---------- row actions: YouTube → Copy → Dig → Want ---------- */
 .acts { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; white-space: nowrap; vertical-align: middle; }
 .act {
   display: inline-flex; align-items: center; justify-content: center; gap: 5px;
@@ -411,37 +411,21 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
   body.home .search { order: 0; padding: 12px; }
 }
 
-/* ---------- action button colours (last, so they win over layout rules) ----------
-   YouTube red · Discogs black · Info blue · Copy grey — muted tones so the rows stay calm;
-   white icon/text on each (≥ 3:1 for icons, YouTube label ≥ 4.5:1). */
-:root {
-  --btn-yt: #b5524c;      --btn-yt-hover: #a3453f;
-  --btn-discogs: #3b4046; --btn-discogs-hover: #2e3237; --btn-discogs-edge: #3b4046;
-  --btn-copy: #8a9099;    --btn-copy-hover: #777e87;
+/* ---------- action buttons: one quiet outline style (last, so it wins over layout rules) ----------
+   Every action looks like Want: light surface, hairline edge, grey label. Colour is kept
+   for meaning only — the YouTube play icon, and green / red feedback after Copy or Share. */
+.act.act-yt, .act.act-dig, .act.act-copy, .act.act-want, .act.act-share {
+  color: var(--fg-2); background: var(--surface); border-color: var(--line-strong);
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --btn-yt: #9c4842;      --btn-yt-hover: #ad5149;
-    --btn-discogs: #2b2f34; --btn-discogs-hover: #33383e; --btn-discogs-edge: #454b52; /* edge keeps it visible on dark */
-    --btn-copy: #5d646c;    --btn-copy-hover: #69717a;
-  }
+.act.act-yt:hover, .act.act-dig:hover, .act.act-copy:hover, .act.act-want:hover, .act.act-share:hover {
+  color: var(--fg); background: var(--surface-2); border-color: var(--fg-3);
 }
-.act.act-yt      { --c: var(--btn-yt);      --c-h: var(--btn-yt-hover);      --e: var(--btn-yt); }
-.act.act-dig     { --c: var(--btn-discogs); --c-h: var(--btn-discogs-hover); --e: var(--btn-discogs-edge); }
-.act.act-copy    { --c: var(--btn-copy);    --c-h: var(--btn-copy-hover);    --e: var(--btn-copy); }
-.act.act-yt, .act.act-dig, .act.act-copy {
-  color: #fff; background: var(--c); border-color: var(--e);
-}
-.act.act-yt:hover, .act.act-dig:hover, .act.act-copy:hover,
-.act.act-dig.open {
-  color: #fff; background: var(--c-h); border-color: var(--c-h);
-}
-.act.act-dig:hover, .act.act-dig.open { border-color: var(--e); }
-.act.act-dig.open { box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 35%, transparent); }
-.act.act-yt:focus-visible, .act.act-dig:focus-visible, .act.act-copy:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-/* copy feedback */
-.act.act-copy.done { background: #3f8a5c; border-color: #3f8a5c; color: #fff; }
-.act.act-copy.fail { background: #a3453f; border-color: #a3453f; color: #fff; }
+.act.act-yt svg { color: var(--yt); }
+.act.act-dig.open { color: var(--fg); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.act.act-yt:focus-visible, .act.act-dig:focus-visible, .act.act-copy:focus-visible, .act.act-want:focus-visible, .act.act-share:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* copy / share feedback: tinted outline, no solid fill */
+.act.act-copy.done, .act.act-share.done { color: var(--ok); border-color: var(--ok); background: var(--accent-soft); }
+.act.act-copy.fail, .act.act-share.fail { color: var(--err); border-color: var(--err); background: color-mix(in srgb, var(--err) 10%, var(--surface)); }
 /* want: outline star; filled amber star once in the list */
 .act.act-want[aria-pressed="true"] { color: #b07800; }
 .act.act-want[aria-pressed="true"] svg { fill: #e3a412; stroke: #b07800; }
@@ -452,10 +436,7 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 .want-tools { margin: 12px 0 0; }
 .act.act-copy-all { min-width: 170px; }
 .want-star { color: #b07800; }
-/* share (tune page): neutral outline, it acts on the page rather than the tune */
 .act.act-share { min-width: 118px; } /* fits "Link copied", so width never changes */
-.act.act-share.done { background: #3f8a5c; border-color: #3f8a5c; color: #fff; }
-.act.act-share.fail { background: #a3453f; border-color: #a3453f; color: #fff; }
 
 /* ---------- cookie consent (EU/EEA, UK, CH only; see /analytics.js) ---------- */
 .consent {
