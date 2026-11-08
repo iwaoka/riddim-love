@@ -5,6 +5,7 @@ import { labelMeta, ORIGIN, parsePagePath, personMeta, refPath, riddimMeta, tune
 import { filterWords, matches } from '../shared/filter';
 import { sameName, splitArtistTitle, splitByArtistPrefix, splitByArtistSuffix, swapArtistTitle, type ArtistTitle } from '../shared/pair';
 import { sortRows, type SortDir, type SortKey } from '../shared/sort';
+import { parseWant, toWantItem, WANT_KEY, WANT_MAX, wantText, type WantItem } from '../shared/want';
 
 const HOME_TITLE = 'RIDDIM.LOVE — Riddim search for reggae & dancehall selectors';
 const HOME_DESCRIPTION =
@@ -82,13 +83,15 @@ type Route =
   | { view: 'home'; type: SearchType }
   | { view: 'search'; q: string; type: SearchType }
   | { view: 'list'; kind: ListKind; id: number; f: string }
-  | { view: 'tune'; id: number };
+  | { view: 'tune'; id: number }
+  | { view: 'want' };
 
 const LIST_KINDS: ListKind[] = ['riddim', 'artist', 'producer', 'label'];
 const ID_RE = /^[1-9]\d{0,8}$/;
 
 function parseRoute(loc: { pathname: string; search: string }): Route {
   const p = new URLSearchParams(loc.search);
+  if (/^\/want\/?$/.test(loc.pathname)) return { view: 'want' };
   const page = parsePagePath(loc.pathname);
   if (page) {
     if (page.kind === 'tune') return { view: 'tune', id: page.id };
@@ -252,6 +255,7 @@ const ICONS = {
   play: ['poly:6 3 20 12 6 21 6 3'],
   disc: ['circle:12,12,10', 'circle:12,12,2'],
   share: ['M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8', 'M16 6l-4-4-4 4', 'M12 2v13'],
+  star: ['poly:12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'],
 } as const;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -355,6 +359,89 @@ function shareButton(title: string, url: string): HTMLButtonElement {
   });
   return btn;
 }
+
+// ---------- Want list (this browser only; see shared/want.ts) ----------
+let wants: WantItem[] = [];
+function loadWants() {
+  try {
+    wants = parseWant(localStorage.getItem(WANT_KEY));
+  } catch {
+    wants = []; // storage blocked (private mode, site data off)
+  }
+}
+function saveWants(): boolean {
+  try {
+    localStorage.setItem(WANT_KEY, JSON.stringify(wants));
+    return true;
+  } catch {
+    return false;
+  }
+}
+/** Set by the Want page to keep its count current; cleared on every render. */
+let onWantChange: (() => void) | null = null;
+const isWanted = (id: number) => wants.some((w) => w.id === id);
+
+const wantNav = document.getElementById('want-nav') as HTMLAnchorElement | null;
+function showWantCount() {
+  onWantChange?.();
+  if (!wantNav) return;
+  const n = wants.length;
+  const c = wantNav.querySelector('.want-n');
+  if (c) c.textContent = n ? String(n) : '';
+  wantNav.setAttribute('aria-label', `Want list, ${n} tune${n === 1 ? '' : 's'}`);
+}
+
+/** Adds or removes a tune; every Want button for it follows. */
+function toggleWant(row: Row): boolean {
+  const on = !isWanted(row.id);
+  if (on) {
+    if (wants.length >= WANT_MAX) {
+      announce(`The want list holds up to ${WANT_MAX} tunes`);
+      return false;
+    }
+    wants.unshift(toWantItem(row));
+  } else wants = wants.filter((w) => w.id !== row.id);
+  if (!saveWants()) announce('Could not save: this browser blocks site storage');
+  syncWantButtons();
+  showWantCount();
+  announce(on ? `Added to want list: ${row.title}` : `Removed from want list: ${row.title}`);
+  return true;
+}
+
+function syncWantButtons() {
+  for (const b of document.querySelectorAll<HTMLButtonElement>('button.act-want')) {
+    const on = isWanted(Number(b.dataset.id));
+    b.setAttribute('aria-pressed', String(on));
+    b.title = on ? 'In your want list (click to remove)' : 'Add to want list';
+  }
+}
+
+/** ☆ / ★ toggle. Kept in this browser only. */
+function wantButton(row: Row, withText = false): HTMLButtonElement {
+  const on = isWanted(row.id);
+  const btn = h('button', {
+    type: 'button', class: 'act act-want', 'data-id': row.id, 'aria-pressed': String(on),
+    title: on ? 'In your want list (click to remove)' : 'Add to want list',
+    'aria-label': `Want “${row.title}”`,
+  }, h('span', { class: 'act-ico' }, icon('star', 16)), withText ? h('span', { class: 'act-text' }, 'Want') : actLabel('Want'));
+  btn.addEventListener('click', () => toggleWant(row));
+  return btn;
+}
+
+loadWants();
+showWantCount();
+wantNav?.addEventListener('click', (e) => {
+  if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return;
+  e.preventDefault();
+  navigate('/want');
+});
+// Another tab changed the list: follow it.
+window.addEventListener('storage', (e) => {
+  if (e.key !== WANT_KEY && e.key !== null) return;
+  loadWants();
+  syncWantButtons();
+  showWantCount();
+});
 
 // ---------- Dig: one shared popover menu for every row ----------
 // Built lazily, positioned with fixed coordinates (no layout shift), filled
@@ -501,10 +588,9 @@ function digButton(row: Pick<Row, 'artists' | 'title'>): HTMLButtonElement {
   return btn;
 }
 
-/** Row actions, in priority order: YouTube → Info → Copy → Dig. */
-/** YouTube → Copy → Dig. Tune details are reached by clicking the title. */
+/** YouTube → Copy → Dig → Want. Tune details are reached by clicking the title. */
 function rowActions(row: Row): HTMLElement[] {
-  return [youtubeButton(row), copyButton(copyText(row.artists, row.title)), digButton(row)];
+  return [youtubeButton(row), copyButton(copyText(row.artists, row.title)), digButton(row), wantButton(row)];
 }
 
 type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean };
@@ -1147,10 +1233,61 @@ async function renderTune(id: number, signal: AbortSignal) {
       h('h1', { class: 'at' }, text),
       h('dl', {}, ...rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, ...v)])),
       // Dig is laid out open here (no menu to open): one click to a shop.
-      h('p', { class: 'acts acts-lg' }, youtubeButton(t), copyButton(copyText(t.artists, t.title)), shareButton(text, ORIGIN + tunePath(t))),
+      h('p', { class: 'acts acts-lg' }, youtubeButton(t), copyButton(copyText(t.artists, t.title)), wantButton(t, true), shareButton(text, ORIGIN + tunePath(t))),
       digLinks(t),
     ),
   );
+}
+
+/**
+ * Want list: read from this browser, no requests. Removing a tune keeps its
+ * row (★ → ☆) until the next visit, so a slip is one click to undo.
+ */
+function renderWant() {
+  setHead(`Want list | RIDDIM.LOVE`, 'Tunes you want, kept in this browser.', null);
+  input.value = '';
+  loadWants();
+  const items = [...wants];
+  const count = h('p', { class: 'count', role: 'status' });
+  const setCount = () => {
+    const n = wants.length;
+    count.textContent = n ? `${n} tune${n === 1 ? '' : 's'} · saved in this browser only` : 'Saved in this browser only';
+  };
+  setCount();
+
+  // Copy the whole list as plain lines for a memo app.
+  const copyAll = h('button', { type: 'button', class: 'act act-copy act-copy-all' }, h('span', { class: 'act-ico' }, icon('copy', 16)), h('span', { class: 'act-text' }, 'Copy list as text'));
+  copyAll.addEventListener('click', async () => {
+    const current = wants; // what is still wanted now, newest first
+    const ok = current.length > 0 && (await copyToClipboard(wantText(current)));
+    copyAll.classList.toggle('done', ok);
+    copyAll.classList.toggle('fail', !ok);
+    (copyAll.lastChild as HTMLElement).textContent = ok ? `Copied ${current.length} line${current.length === 1 ? '' : 's'}` : current.length ? 'Copy failed' : 'Nothing to copy';
+    announce((copyAll.lastChild as HTMLElement).textContent!);
+    window.setTimeout(() => {
+      copyAll.classList.remove('done', 'fail');
+      (copyAll.lastChild as HTMLElement).textContent = 'Copy list as text';
+    }, 1800);
+  });
+
+  const head = h('header', { class: 'list-head' },
+    h('div', { class: 'head-top' }, h('p', { class: 'kind' }, 'Want')),
+    h('h1', {}, 'Want list'),
+    h('p', { class: 'acts acts-lg want-tools' }, copyAll),
+  );
+  const rows: Row[] = items.map((w) => ({
+    id: w.id, title: w.title, year: w.year,
+    artists: w.artists.map((a) => ({ ...a, url: null })),
+    riddim: w.riddim ? { ...w.riddim, url: null, version_of: null } : null,
+    label: w.label ? { ...w.label, url: null } : null,
+  }));
+  const body = rows.length
+    ? tuneTable(rows).el
+    : h('p', { class: 'state' }, 'Nothing here yet. Press ', h('span', { class: 'want-star', 'aria-hidden': 'true' }, '☆'), ' Want on any tune to keep it here.');
+  // Keep the count in step while tunes are removed / re-added on this page.
+  onWantChange = setCount;
+  main.replaceChildren(head, count, body);
+  announce(`Want list: ${count.textContent}`);
 }
 
 // ---------- render loop ----------
@@ -1171,11 +1308,14 @@ function trackPageView(signal: AbortSignal) {
 
 async function render() {
   closeDig(false);
+  onWantChange = null;
   navController?.abort();
   const ctrl = new AbortController();
   navController = ctrl;
   const route = parseRoute(location);
   document.body.classList.toggle('home', route.view === 'home');
+  if (route.view === 'want') wantNav?.setAttribute('aria-current', 'page');
+  else wantNav?.removeAttribute('aria-current');
   if (route.view === 'home' || route.view === 'search') {
     showType(route.type);
     // Keep the URL canonical (e.g. a missing or unknown ?type=) so it can be shared as-is.
@@ -1187,6 +1327,7 @@ async function render() {
     if (route.view === 'home') renderHome();
     else if (route.view === 'search') await renderSearch(route.q, route.type, ctrl.signal);
     else if (route.view === 'list') await renderList(route, ctrl.signal);
+    else if (route.view === 'want') renderWant();
     else await renderTune(route.id, ctrl.signal);
     trackPageView(ctrl.signal);
   } catch (e) {

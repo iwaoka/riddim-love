@@ -227,6 +227,21 @@ async function serveShell(env: Env, url: URL, request: Request): Promise<Respons
     .transform(out);
 }
 
+/**
+ * /want: the visitor's want list, kept in their own browser — the page is the
+ * plain app shell (the app fills it from localStorage). Private: noindex, no canonical.
+ */
+async function serveWant(env: Env, url: URL, request: Request): Promise<Response> {
+  const res = await env.ASSETS.fetch(new Request(new URL('/', url), request));
+  if (res.status !== 200) return res;
+  const out = new Response(res.body, res);
+  out.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  return new HTMLRewriter()
+    .on('link[rel="canonical"]', { element(el) { el.remove(); } })
+    .on('title', { element(el) { el.setInnerContent('Want list | RIDDIM.LOVE'); } })
+    .transform(out);
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -238,6 +253,7 @@ export default {
       if (redirect) return redirect;
       if (url.pathname === "/") return markVisitor(request, url, env, await serveShell(env, url, request));
       if (url.pathname === '/sitemap.xml') return serveSitemap(ctx);
+      if (url.pathname === '/want') return markVisitor(request, url, env, await serveWant(env, url, request));
       const page = parsePagePath(url.pathname);
       if (page) return markVisitor(request, url, env, await servePage(request, env, ctx, url, page));
       return env.ASSETS.fetch(request);
