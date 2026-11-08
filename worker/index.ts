@@ -174,6 +174,7 @@ function markVisitor(request: Request, url: URL, env: Env, res: Response): Respo
   // The home view (no search words) starts with body.home, so the header shows
   // the word mark from the first paint instead of flashing the logo image.
   const isHome = url.pathname === '/' && !url.searchParams.get('q');
+  const isPage = parsePagePath(url.pathname) !== null;
   const out = new HTMLRewriter()
     .on('html', {
       element(el) {
@@ -184,6 +185,9 @@ function markVisitor(request: Request, url: URL, env: Env, res: Response): Respo
     .on('body', {
       element(el) {
         if (isHome) el.setAttribute('class', 'home');
+        // Detail pages credit Riddim-ID in their own head (View on Riddim-ID ↗),
+        // so the header credit under the search box is hidden there from the first paint.
+        if (isPage) el.setAttribute('data-view', 'page');
       },
     })
     .transform(res);
