@@ -73,7 +73,7 @@ const KIND_LABEL: Record<PageKind, string> = { riddim: 'Riddim', artist: 'Artist
 
 /** Kind chip + the Riddim-ID source link, small at the right (same as the app). */
 const headTop = (kind: PageKind, src: string | null) =>
-  `<div class="head-top"><p class="kind">${KIND_LABEL[kind]}</p>${src ? ext(src, 'View on Riddim-ID ↗', 'src') : ''}</div>`;
+  `<div class="head-top"><p class="kind">${KIND_LABEL[kind]}</p>${src ? ext(src, 'Search data provided by Riddim-ID', 'src') : ''}</div>`;
 
 function listHead(kind: ListKind, meta: PageMeta, extra: string[], src: string | null): string {
   return `<header class="list-head">${headTop(kind, src)}<h1>${esc(meta.h1)}</h1>` + extra.filter(Boolean).join('') + `</header>`;

@@ -195,7 +195,7 @@ function external(url: string | null, text: string, cls = ''): HTMLElement | nul
 function headTop(kind: string, sourceUrl: string | null): HTMLElement {
   return h('div', { class: 'head-top' },
     h('p', { class: 'kind' }, kind),
-    external(sourceUrl, 'View on Riddim-ID ↗', 'src'),
+    external(sourceUrl, 'Search data provided by Riddim-ID', 'src'),
   );
 }
 
@@ -1314,9 +1314,6 @@ async function render() {
   navController = ctrl;
   const route = parseRoute(location);
   document.body.classList.toggle('home', route.view === 'home');
-  // Same as the Worker's first paint: list / tune pages carry their own Riddim-ID link.
-  if (route.view === 'list' || route.view === 'tune') document.body.dataset.view = 'page';
-  else delete document.body.dataset.view;
   if (route.view === 'want') wantNav?.setAttribute('aria-current', 'page');
   else wantNav?.removeAttribute('aria-current');
   if (route.view === 'home' || route.view === 'search') {
