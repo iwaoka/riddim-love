@@ -627,6 +627,17 @@ function tuneRow(row: Row, opts: TableOpts = {}): HTMLTableRowElement {
  */
 function onRowClick(e: MouseEvent) {
   const target = e.target as Element;
+  // YouTube / Copy / Dig / Want: the row gets the same mark as one come back to,
+  // so it is easy to find again (e.g. after the YouTube tab).
+  const act = target.closest('.act');
+  if (act) {
+    const id = rowTuneId(act.closest('tr'));
+    if (id !== null) {
+      returnedId = id;
+      markReturned();
+    }
+    return;
+  }
   if (target.closest('a, button, input, label, summary')) return;
   const tr = target.closest('tr');
   const a = tr?.querySelector<HTMLAnchorElement>('a.tune-link');
@@ -682,6 +693,7 @@ function tuneTable(
         ? ordered.map((r) => tuneRow(r, opts))
         : [h('tr', { class: 'empty' }, h('td', { colspan: cols }, 'No tunes match this filter.'))]),
     );
+    markReturned(); // rows were rebuilt: put the mark back
     for (const [key, th] of ths) {
       const active = sort?.key === key;
       th.setAttribute('aria-sort', active ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : 'none');
@@ -1410,11 +1422,15 @@ function restoreScroll() {
   if (pendingY !== null) window.scrollTo(0, pendingY);
   markReturned();
 }
+function rowTuneId(tr: Element | null): number | null {
+  const a = tr?.querySelector<HTMLAnchorElement>('a.tune-link');
+  const p = a ? parsePagePath(new URL(a.href).pathname) : null;
+  return p?.kind === 'tune' ? p.id : null;
+}
 function markReturned() {
   if (returnedId === null) return;
   for (const a of main.querySelectorAll<HTMLAnchorElement>('a.tune-link')) {
-    const p = parsePagePath(new URL(a.href).pathname);
-    if (p?.kind !== 'tune' || p.id !== returnedId) continue;
+    if (rowTuneId(a.closest('tr')) !== returnedId) continue;
     for (const tr of main.querySelectorAll('tr.returned')) tr.classList.remove('returned');
     a.closest('tr')?.classList.add('returned');
     // Focus only if nothing else has it (a repaint after loading drops focus to <body>).
