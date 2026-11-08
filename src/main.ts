@@ -4,7 +4,7 @@ import { artistNames, copyText, displayText, externalSearchUrl, searchText } fro
 import { labelMeta, ORIGIN, parsePagePath, personMeta, refPath, riddimMeta, tuneMeta, tunePath, type PageMeta } from '../shared/seo';
 import { filterWords, matches } from '../shared/filter';
 import { sameName, splitArtistTitle, splitByArtistPrefix, splitByArtistSuffix, swapArtistTitle, type ArtistTitle } from '../shared/pair';
-import { sortRows, type SortDir, type SortKey } from '../shared/sort';
+import { formatSort, parseSort, sortRows, type SortDir, type SortKey } from '../shared/sort';
 import { parseWant, toWantItem, WANT_KEY, WANT_MAX, wantText, type WantItem } from '../shared/want';
 
 const HOME_TITLE = 'RIDDIM.LOVE — Riddim search for reggae & dancehall selectors';
@@ -82,7 +82,7 @@ async function api<T>(path: string, signal?: AbortSignal): Promise<T> {
 type Route =
   | { view: 'home'; type: SearchType }
   | { view: 'search'; q: string; type: SearchType }
-  | { view: 'list'; kind: ListKind; id: number; f: string }
+  | { view: 'list'; kind: ListKind; id: number; f: string; sort: { key: SortKey; dir: SortDir } | null }
   | { view: 'tune'; id: number }
   | { view: 'want' };
 
@@ -95,7 +95,7 @@ function parseRoute(loc: { pathname: string; search: string }): Route {
   const page = parsePagePath(loc.pathname);
   if (page) {
     if (page.kind === 'tune') return { view: 'tune', id: page.id };
-    return { view: 'list', kind: page.kind, id: page.id, f: p.get('f') ?? '' };
+    return { view: 'list', kind: page.kind, id: page.id, f: p.get('f') ?? '', sort: parseSort(p.get('sort')) };
   }
   // Old query-string URLs (the Worker 301s these to path URLs; kept as a fallback).
   const tune = p.get('tune');
@@ -103,7 +103,7 @@ function parseRoute(loc: { pathname: string; search: string }): Route {
   for (const kind of LIST_KINDS) {
     const id = p.get(kind);
     if (id && ID_RE.test(id)) {
-      return { view: 'list', kind, id: Number(id), f: p.get('f') ?? '' };
+      return { view: 'list', kind, id: Number(id), f: p.get('f') ?? '', sort: parseSort(p.get('sort')) };
     }
   }
   const raw = p.get('type');
@@ -153,13 +153,18 @@ function showType(type: SearchType) {
 }
 
 function navigate(href: string, replace = false) {
+  pendingY = null;
   const url = new URL(href, location.href);
   if (url.search === location.search && url.pathname === location.pathname) {
     render();
     return;
   }
   if (replace) history.replaceState(null, '', url);
-  else history.pushState(null, '', url);
+  else {
+    // Remember where the visitor was, so Back returns to the same spot.
+    history.replaceState({ ...(history.state ?? {}), y: window.scrollY }, '');
+    history.pushState(null, '', url);
+  }
   render();
   window.scrollTo(0, 0);
 }
@@ -1125,6 +1130,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
         bulk = null;
         if (!signal.aborted) {
           setCount();
+          restoreScroll(); // a sorted / filtered list only settles once every page is in
           if (failed || !quiet) announce(failed ? 'Could not load every tune' : `All ${held} tunes loaded`);
         }
       }
@@ -1148,12 +1154,18 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
     more.hidden = !cursor || held >= CAP || !!bulk || !!active || !!q;
   };
 
+  // Sort and filter live in the URL (?sort=-year&f=…), so Back from a tune
+  // page, a reload or a shared link brings the same view back.
+  const syncUrl = () =>
+    history.replaceState(history.state, '', withQuery(location.pathname, { f: filter.value.trim() || null, sort: formatSort(table.sort()) }));
   const table: TuneTable = tuneTable(list.tunes, {
     hideRiddim: kind === 'riddim',
     hideLabel: kind === 'label',
+    sort: route.sort,
     onSort: () => {
       loadAll();
       setCount();
+      syncUrl();
     },
   });
 
@@ -1165,7 +1177,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
     clearTimeout(urlTimer);
     urlTimer = window.setTimeout(() => {
       // Keep the filter in the URL (shareable) without re-rendering the page.
-      history.replaceState(null, '', withQuery(location.pathname, { f: filter.value.trim() || null }));
+      syncUrl();
     }, 300);
   };
   filter.addEventListener('input', applyFilter);
@@ -1329,6 +1341,7 @@ async function render() {
     else if (route.view === 'list') await renderList(route, ctrl.signal);
     else if (route.view === 'want') renderWant();
     else await renderTune(route.id, ctrl.signal);
+    if (!ctrl.signal.aborted) restoreScroll();
     trackPageView(ctrl.signal);
   } catch (e) {
     if (ctrl.signal.aborted) return;
@@ -1381,6 +1394,23 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-window.addEventListener('popstate', () => render());
+// ---------- Back / Forward / reload: return to the same scroll position ----------
+// The browser's own restoration runs before the view is rebuilt, so it is done
+// here: the position is kept in history.state (set when leaving a page) and
+// applied once the view is painted — and again when a sorted list has loaded
+// every page. Any scroll, tap or key from the visitor cancels it.
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+let pendingY: number | null = typeof history.state?.y === 'number' ? history.state.y : null;
+function restoreScroll() {
+  if (pendingY !== null) window.scrollTo(0, pendingY);
+}
+for (const ev of ['wheel', 'touchstart', 'keydown', 'mousedown'] as const) {
+  window.addEventListener(ev, () => { pendingY = null; }, { passive: true, capture: true });
+}
+window.addEventListener('pagehide', () => history.replaceState({ ...(history.state ?? {}), y: window.scrollY }, ''));
+window.addEventListener('popstate', () => {
+  pendingY = typeof history.state?.y === 'number' ? history.state.y : 0;
+  render();
+});
 showType(storedType());
 render();

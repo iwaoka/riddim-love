@@ -65,3 +65,16 @@ export function sortRows<T extends Sortable>(rows: readonly T[], key: SortKey, d
 export function sortByLabelArtistTitle<T extends Sortable>(rows: readonly T[]): T[] {
   return sortRows(rows, 'label', 'asc');
 }
+
+/** URL form of a column sort: "year" (ascending) / "-year" (descending). */
+export function formatSort(s: { key: SortKey; dir: SortDir } | null): string | null {
+  return s ? (s.dir === 'desc' ? '-' : '') + s.key : null;
+}
+
+/** Reads ?sort=; null for a missing or unknown value. */
+export function parseSort(v: string | null | undefined): { key: SortKey; dir: SortDir } | null {
+  if (!v) return null;
+  const desc = v.startsWith('-');
+  const key = (desc ? v.slice(1) : v) as SortKey;
+  return SORT_KEYS.includes(key) ? { key, dir: desc ? 'desc' : 'asc' } : null;
+}

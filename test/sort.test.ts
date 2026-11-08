@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sortByLabelArtistTitle, sortRows } from '../shared/sort';
+import { formatSort, parseSort, sortByLabelArtistTitle, sortRows } from '../shared/sort';
 
 const r = (id: number, label: string | null, artist: string, title: string) => ({
   id,
@@ -66,5 +66,16 @@ describe('sortRows (column sort)', () => {
   it('year numeric; unknown year last in both directions', () => {
     expect(ids(sortRows(rows, 'year', 'asc'))).toEqual([1, 2, 4, 3]); // 1985 tie → label (blank last)
     expect(ids(sortRows(rows, 'year', 'desc'))).toEqual([4, 1, 2, 3]);
+  });
+});
+
+describe('sort in the URL', () => {
+  it('round-trips and rejects unknown values', () => {
+    expect(formatSort({ key: 'year', dir: 'desc' })).toBe('-year');
+    expect(formatSort({ key: 'artist', dir: 'asc' })).toBe('artist');
+    expect(formatSort(null)).toBeNull();
+    expect(parseSort('-year')).toEqual({ key: 'year', dir: 'desc' });
+    expect(parseSort('label')).toEqual({ key: 'label', dir: 'asc' });
+    for (const bad of [null, '', '-', 'bpm', '--year', 'Year']) expect(parseSort(bad)).toBeNull();
   });
 });
