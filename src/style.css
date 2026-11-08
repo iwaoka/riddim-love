@@ -249,6 +249,10 @@ p.state[role="status"] { flex-direction: row; align-items: center; gap: 8px; }
 /* zebra stripes + hover */
 .tunes tbody tr:nth-child(even), .names-table tbody tr:nth-child(even) { background: var(--stripe); }
 .tunes tbody tr:hover, .names-table tbody tr:hover { background: var(--row-hover); }
+/* the tune just come back from (Back from its page): same look as hover; the row itself shows focus */
+.tunes tbody tr.returned { background: var(--row-hover); }
+.tunes tbody tr.returned .tune-link { color: var(--accent); }
+.tunes tbody tr.returned .tune-link:focus-visible { outline: none; text-decoration: underline; }
 
 .tunes td { padding: 5px 10px; }
 .tunes th:first-child, .tunes td:first-child { padding-left: 14px; }

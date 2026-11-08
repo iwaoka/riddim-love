@@ -154,6 +154,7 @@ function showType(type: SearchType) {
 
 function navigate(href: string, replace = false) {
   pendingY = null;
+  returnedId = null;
   const url = new URL(href, location.href);
   if (url.search === location.search && url.pathname === location.pathname) {
     render();
@@ -162,7 +163,9 @@ function navigate(href: string, replace = false) {
   if (replace) history.replaceState(null, '', url);
   else {
     // Remember where the visitor was, so Back returns to the same spot.
-    history.replaceState({ ...(history.state ?? {}), y: window.scrollY }, '');
+    // Opening a tune also notes which one, so Back can mark its row.
+    const to = parsePagePath(url.pathname);
+    history.replaceState({ ...(history.state ?? {}), y: window.scrollY, from: to?.kind === 'tune' ? to.id : null }, '');
     history.pushState(null, '', url);
   }
   render();
@@ -1401,8 +1404,23 @@ document.addEventListener('keydown', (e) => {
 // every page. Any scroll, tap or key from the visitor cancels it.
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 let pendingY: number | null = typeof history.state?.y === 'number' ? history.state.y : null;
+/** Tune the visitor came back from: its row is marked like a hovered row, and its title focused. */
+let returnedId: number | null = null;
 function restoreScroll() {
   if (pendingY !== null) window.scrollTo(0, pendingY);
+  markReturned();
+}
+function markReturned() {
+  if (returnedId === null) return;
+  for (const a of main.querySelectorAll<HTMLAnchorElement>('a.tune-link')) {
+    const p = parsePagePath(new URL(a.href).pathname);
+    if (p?.kind !== 'tune' || p.id !== returnedId) continue;
+    for (const tr of main.querySelectorAll('tr.returned')) tr.classList.remove('returned');
+    a.closest('tr')?.classList.add('returned');
+    // Focus only if nothing else has it (a repaint after loading drops focus to <body>).
+    if (!document.activeElement || document.activeElement === document.body || document.activeElement === main) a.focus({ preventScroll: true });
+    return;
+  }
 }
 for (const ev of ['wheel', 'touchstart', 'keydown', 'mousedown'] as const) {
   window.addEventListener(ev, () => { pendingY = null; }, { passive: true, capture: true });
@@ -1410,6 +1428,7 @@ for (const ev of ['wheel', 'touchstart', 'keydown', 'mousedown'] as const) {
 window.addEventListener('pagehide', () => history.replaceState({ ...(history.state ?? {}), y: window.scrollY }, ''));
 window.addEventListener('popstate', () => {
   pendingY = typeof history.state?.y === 'number' ? history.state.y : 0;
+  returnedId = typeof history.state?.from === 'number' ? history.state.from : null;
   render();
 });
 showType(storedType());
