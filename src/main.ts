@@ -532,6 +532,36 @@ function ensureDigMenu(): HTMLDivElement {
   return menu;
 }
 
+// ---------- phones: store apps drop the search words ----------
+// On a phone, Spotify / Apple Music / SoundCloud / Discogs… links open their
+// app, which ignores the search in the URL. So a tap there also copies
+// "Artist Title" to the clipboard, ready to paste into the app's search box.
+let toastEl: HTMLElement | null = null;
+let toastTimer = 0;
+function toast(msg: string) {
+  if (!toastEl) {
+    toastEl = h('div', { class: 'toast', 'aria-hidden': 'true' }); // the live region (announce) speaks it
+    document.body.appendChild(toastEl);
+  }
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => toastEl?.classList.remove('show'), 4000);
+}
+
+/** Click handler for a Listen / Dig search link: on touch screens, copy the query too. */
+function keepQuery(query: string): EventListener {
+  return () => {
+    if (!matchMedia('(pointer: coarse)').matches) return; // desktop: the web page keeps the search
+    void copyToClipboard(query).then((ok) => {
+      if (!ok) return;
+      const msg = `Copied “${query}” — if the app opens without it, paste it into its search.`;
+      toast(msg);
+      announce(msg);
+    });
+  };
+}
+
 /** The two menus that share the popover: record shops (Dig) and streaming services (Listen). */
 type MenuKind = 'dig' | 'listen';
 const MENU = {
@@ -560,6 +590,7 @@ function openDig(btn: HTMLButtonElement, row: Pick<Row, 'artists' | 'title'>, fo
         target: '_blank',
         rel: 'noopener noreferrer',
         title: `Search ${l.name} for “${query}” (opens in a new tab)`,
+        onclick: keepQuery(query),
       }, h('span', { class: 'dig-name' }, l.name), h('span', { class: 'dig-host', 'aria-hidden': 'true' }, new URL(l.url).hostname.replace(/^(www|open)\./, ''))),
     ),
   );
@@ -585,6 +616,7 @@ function menuLinksOpen(kind: MenuKind, row: Pick<Row, 'artists' | 'title'>): HTM
           target: '_blank',
           rel: 'noopener noreferrer',
           title: `Search ${l.name} for “${query}” (opens in a new tab)`,
+          onclick: keepQuery(query),
         }, h('span', { class: 'act-text' }, l.name)),
       ),
     ),
