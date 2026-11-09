@@ -713,7 +713,7 @@ function rowActions(row: Row): HTMLElement[] {
   return [youtubeButton(row), menuButton('listen', row), menuButton('dig', row), copyButton(copyText(row.artists, row.title)), wantButton(row)];
 }
 
-type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean; /** One more action at the end of each row (e.g. remove from Dig history). */ extra?: (row: Row) => HTMLElement };
+type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean; /** The row's buttons, when not the usual set (e.g. the Dig history). */ actions?: (row: Row) => HTMLElement[] };
 
 function tuneRow(row: Row, opts: TableOpts = {}): HTMLTableRowElement {
   const dash = () => h('span', { class: 'muted' }, '—');
@@ -729,7 +729,7 @@ function tuneRow(row: Row, opts: TableOpts = {}): HTMLTableRowElement {
     opts.hideRiddim ? null : h('td', { class: 'c-riddim' }, row.riddim ? row.riddim.name : dash()),
     opts.hideLabel ? null : h('td', { class: 'c-label' }, row.label ? row.label.name : dash()),
     h('td', { class: 'c-year' }, row.year ? String(row.year) : ''),
-    h('td', { class: 'c-act' }, h('span', { class: 'acts' }, ...rowActions(row), opts.extra ? opts.extra(row) : null)),
+    h('td', { class: 'c-act' }, h('span', { class: 'acts' }, ...(opts.actions ?? rowActions)(row))),
   );
 }
 
@@ -1509,7 +1509,10 @@ function renderDig() {
     });
     return b;
   };
-  const table = digs.length ? tuneTable(digs.map(snapshotRow), { extra: removeButton }) : null;
+  const table = digs.length ? tuneTable(digs.map(snapshotRow), {
+    // YouTube, search again, keep it as a Want, or drop it from the history.
+    actions: (row) => [youtubeButton(row), menuButton('dig', row), wantButton(row), removeButton(row)],
+  }) : null;
   let body: HTMLElement = table ? table.el : empty();
   main.replaceChildren(head, count, body);
   announce(`Dig history: ${count.textContent}`);
