@@ -303,10 +303,11 @@ function icon(name: keyof typeof ICONS, size = 18): SVGSVGElement {
 const actLabel = (text: string, always = false) => h('span', { class: always ? 'act-text' : 'act-text act-text-wide' }, text);
 
 /** Copy "Artist - Title" (local only, no request); brief check-mark feedback. Width never changes. */
-function copyButton(text: string): HTMLButtonElement {
+/** `withText`: labelled (tune page); icon only in tune rows at every width. */
+function copyButton(text: string, withText = false): HTMLButtonElement {
   const label = `Copy “${text}”`;
   const ico = h('span', { class: 'act-ico' }, icon('copy', 16));
-  const btn = h('button', { type: 'button', class: 'act act-copy', title: label, 'aria-label': label }, ico, actLabel('Copy'));
+  const btn = h('button', { type: 'button', class: 'act act-copy', title: label, 'aria-label': label }, ico, withText ? h('span', { class: 'act-text' }, 'Copy') : null);
   let timer = 0;
   btn.addEventListener('click', async () => {
     const ok = await copyToClipboard(text);
@@ -427,14 +428,14 @@ function syncWantButtons() {
   }
 }
 
-/** ☆ / ★ toggle. Kept in this browser only. */
+/** ☆ / ★ toggle. Kept in this browser only. Icon only in tune rows; labelled on the tune page. */
 function wantButton(row: Row, withText = false): HTMLButtonElement {
   const on = isWanted(row.id);
   const btn = h('button', {
     type: 'button', class: 'act act-want', 'data-id': row.id, 'aria-pressed': String(on),
     title: on ? 'In your want list (click to remove)' : 'Add to want list',
     'aria-label': `Want “${row.title}”`,
-  }, h('span', { class: 'act-ico' }, icon('star', 16)), withText ? h('span', { class: 'act-text' }, 'Want') : actLabel('Want'));
+  }, h('span', { class: 'act-ico' }, icon('star', 16)), withText ? h('span', { class: 'act-text' }, 'Want') : null);
   btn.addEventListener('click', () => toggleWant(row));
   return btn;
 }
@@ -617,9 +618,9 @@ function menuButton(kind: MenuKind, row: Pick<Row, 'artists' | 'title'>): HTMLBu
   return btn;
 }
 
-/** YouTube → Listen → Copy → Dig → Want. Tune details are reached by clicking the title. */
+/** YouTube → Listen → Dig, then Copy and Want (icons only). Tune details are reached by clicking the title. */
 function rowActions(row: Row): HTMLElement[] {
-  return [youtubeButton(row), menuButton('listen', row), copyButton(copyText(row.artists, row.title)), menuButton('dig', row), wantButton(row)];
+  return [youtubeButton(row), menuButton('listen', row), menuButton('dig', row), copyButton(copyText(row.artists, row.title)), wantButton(row)];
 }
 
 type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean };
@@ -1293,7 +1294,7 @@ async function renderTune(id: number, signal: AbortSignal) {
       h('h1', { class: 'at' }, text),
       h('dl', {}, ...rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, ...v)])),
       // Dig is laid out open here (no menu to open): one click to a shop.
-      h('p', { class: 'acts acts-lg' }, youtubeButton(t), copyButton(copyText(t.artists, t.title)), wantButton(t, true), shareButton(text, ORIGIN + tunePath(t))),
+      h('p', { class: 'acts acts-lg' }, youtubeButton(t), copyButton(copyText(t.artists, t.title), true), wantButton(t, true), shareButton(text, ORIGIN + tunePath(t))),
       // Listen and Dig are laid out open here (no menu to open): one click to a service.
       menuLinksOpen('listen', t),
       menuLinksOpen('dig', t),

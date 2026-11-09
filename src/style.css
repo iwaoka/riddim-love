@@ -301,7 +301,6 @@ p.state[role="status"] { flex-direction: row; align-items: center; gap: 8px; }
 @media (min-width: 1100px) {
   .act-text-wide { display: inline; }
   .act:not(.act-yt) { width: auto; padding: 0 9px 0 8px; }
-  .act.act-copy { min-width: 70px; } /* label stays "Copy" while the icon flips to ✓, so width never changes */
 }
 /* YouTube icon is a filled play triangle */
 .act-yt svg { fill: currentColor; }
