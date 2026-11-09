@@ -4,6 +4,7 @@ import { LISTEN_PROVIDERS } from '../shared/listen';
 import { artistNames, copyText, displayText, externalSearchUrl, searchText } from '../shared/format';
 import { altNames, labelMeta, ORIGIN, ORIGINAL_TUNES_MAX, originalTuneText, parsePagePath, personMeta, refPath, riddimMeta, tuneMeta, tunePath, type PageMeta } from '../shared/seo';
 import { filterWords, matches } from '../shared/filter';
+import { LANG_KEY, pickLang, stringsFor, type Lang } from '../shared/i18n';
 import { sameName, splitArtistTitle, splitByArtistPrefix, splitByArtistSuffix, swapArtistTitle, type ArtistTitle } from '../shared/pair';
 import { formatSort, parseSort, sortRows, type SortDir, type SortKey } from '../shared/sort';
 import { DIG_KEY, parseDig, parseWant, recordDig, removeDig, toWantItem, WANT_KEY, WANT_MAX, wantText, type DigItem, type TuneSnapshot, type WantItem } from '../shared/want';
@@ -30,6 +31,18 @@ const announce = (msg: string) => {
   announcer.textContent = '';
   setTimeout(() => (announcer.textContent = msg), 30);
 };
+
+// ---------- language for notes and hints (see shared/i18n.ts) ----------
+function savedLang(): string | null {
+  try {
+    return localStorage.getItem(LANG_KEY);
+  } catch {
+    return null;
+  }
+}
+let lang: Lang = pickLang(savedLang(), navigator.languages?.length ? navigator.languages : [navigator.language]);
+/** Notes and hints in the visitor's language. */
+let T = stringsFor(lang);
 
 // ---------- API ----------
 class ApiFailure extends Error {
@@ -65,7 +78,7 @@ async function api<T>(path: string, signal?: AbortSignal): Promise<T> {
       res = await fetch(path, { headers: { Accept: 'application/json' }, signal });
     } catch (e) {
       if ((e as Error).name === 'AbortError') throw e;
-      throw new ApiFailure(0, 'Network error. Check your connection and try again.');
+      throw new ApiFailure(0, T.network);
     }
     const body = (await res.json().catch(() => null)) as T | ApiError | null;
     if (!res.ok) {
@@ -147,7 +160,7 @@ function currentType(): SearchType {
 /** Reflects the search target in the tabs, placeholder and label, and remembers it. */
 function showType(type: SearchType) {
   for (const r of typeRadios) r.checked = r.value === type;
-  input.placeholder = TYPE_UI[type].placeholder;
+  input.placeholder = T.placeholder[type];
   (document.getElementById('q-label') as HTMLElement).textContent = TYPE_UI[type].label;
   try {
     localStorage.setItem(TYPE_KEY, type);
@@ -415,7 +428,7 @@ function toggleWant(row: Row): boolean {
     }
     wants.unshift(toWantItem(row));
   } else wants = wants.filter((w) => w.id !== row.id);
-  if (!saveWants()) announce('Could not save: this browser blocks site storage');
+  if (!saveWants()) announce(T.cannotSave);
   syncWantButtons();
   showWantCount();
   announce(on ? `Added to want list: ${row.title}` : `Removed from want list: ${row.title}`);
@@ -573,8 +586,7 @@ function ensureDigMenu(): HTMLDivElement {
 // "Artist Title" to the clipboard, ready to paste into the app's search box,
 // and a red note says so where the services are listed (shown on touch
 // screens only, by CSS) — read before the tap, since the app opens at once.
-const APP_NOTE = 'Opens the app? The search is copied when you tap — paste it into the app’s search.';
-const appNote = () => h('p', { class: 'app-note' }, APP_NOTE);
+const appNote = () => h('p', { class: 'app-note' }, T.appNote);
 
 /** Click handler for a Listen / Dig search link: on touch screens, copy the query too. */
 function keepQuery(query: string): EventListener {
@@ -805,7 +817,7 @@ function tuneTable(
     tbody.replaceChildren(
       ...(ordered.length
         ? ordered.map((r) => tuneRow(r, opts))
-        : [h('tr', { class: 'empty' }, h('td', { colspan: cols }, 'No tunes match this filter.'))]),
+        : [h('tr', { class: 'empty' }, h('td', { colspan: cols }, T.noFilterMatch))]),
     );
     markReturned(); // rows were rebuilt: put the mark back
     for (const [key, th] of ths) {
@@ -883,11 +895,11 @@ function loading(msg: string) {
 
 function showError(err: unknown, retry: () => void) {
   if ((err as Error).name === 'AbortError') return;
-  const msg = err instanceof ApiFailure ? err.message : 'Something went wrong.';
+  const msg = err instanceof ApiFailure ? err.message : T.somethingWrong;
   main.replaceChildren(
     h('div', { class: 'state error', role: 'alert' },
       h('p', {}, msg),
-      h('button', { type: 'button', onclick: retry as EventListener }, 'Try again'),
+      h('button', { type: 'button', onclick: retry as EventListener }, T.tryAgain),
     ),
   );
 }
@@ -900,20 +912,6 @@ function renderHome() {
   input.value = '';
   // Autofocus only with a mouse/trackpad; on phones it would pop the keyboard.
   if (matchMedia('(pointer: fine)').matches) input.focus();
-}
-
-const NO_MATCH_TIP: Record<SearchType, string> = {
-  riddim: 'Try another spelling or fewer words. Riddim names often drop the word “Riddim”.',
-  tune: 'Tune search looks at titles. “Artist - Title” or “Artist Title” also works (beta), or switch to Artist.',
-  artist: 'Try another spelling, or the artist’s best-known name.',
-  label: 'Try another spelling, or the label’s short name.',
-  producer: 'Try another spelling, or the name the producer is credited under (e.g. Prince Jammy / King Jammy).',
-};
-
-function countNote(n: number, limit: number, noun: string, extra = ''): string {
-  return n >= limit
-    ? `Top ${limit} ${noun} (search returns at most ${limit}). Refine the search to narrow it down.${extra}`
-    : `${n} ${n === 1 ? noun.replace(/s$/, '') : noun}.${extra}`;
 }
 
 function namesTable(type: Exclude<SearchType, 'tune'>, hits: NameHit[]): HTMLElement {
@@ -950,7 +948,7 @@ async function renderSearch(q: string, type: SearchType, signal: AbortSignal) {
   setHead(`${q} (${type}) — RIDDIM.LOVE`, null, null); // search views are not canonical pages
   input.value = q;
   if (q.length < 2) {
-    main.replaceChildren(h('p', { class: 'state' }, 'Type at least 2 characters.'));
+    main.replaceChildren(h('p', { class: 'state' }, T.minChars));
     return;
   }
   const pair = type === 'tune' ? splitArtistTitle(q) : null;
@@ -965,18 +963,18 @@ async function renderSearch(q: string, type: SearchType, signal: AbortSignal) {
   if (!n && type === 'tune' && !pair && /\s/.test(q.trim()) && (await artistPrefixSearch(q, signal))) return;
   if (signal.aborted) return;
   if (!n) {
-    await renderNoMatch(res.query, type, pair ? `No artist page is named “${pair.primary}” either. Check the spelling, or search the title alone.` : NO_MATCH_TIP[type], signal);
+    await renderNoMatch(res.query, type, pair ? T.noArtistEither(pair.primary) : T.noMatchTip[type], signal);
     return;
   }
 
   let body: HTMLElement;
   let note: string;
   if (type === 'tune') {
-    note = countNote(n, res.limit, 'title matches', ' Searching tune titles only. Click a column to sort.');
+    note = T.count(type, n, res.limit);
     // Search hits carry no label, so the default Label → Artist → Title order is Artist → Title.
     body = tuneTable(res.tunes.map((t: TuneHit) => ({ ...t, label: null })), { hideLabel: true, sort: { key: 'artist', dir: 'asc' } }).el;
   } else {
-    note = countNote(n, res.limit, TYPE_UI[type].plural, ` Open one to see all its tunes.`);
+    note = T.count(type, n, res.limit);
     body = namesTable(type, res.names.filter((x) => x.type === type));
   }
   main.replaceChildren(
@@ -1007,13 +1005,13 @@ const TYPE_NAME: Record<SearchType, string> = { riddim: 'Riddim', tune: 'Tune', 
  * did match, and a button back into the search box.
  */
 async function renderNoMatch(q: string, type: SearchType, tip: string, signal: AbortSignal) {
-  const edit = h('button', { type: 'button', class: 'retry' }, 'Edit search');
+  const edit = h('button', { type: 'button', class: 'retry' }, T.editSearch);
   edit.addEventListener('click', () => {
     input.focus();
     input.select();
   });
   const head = [
-    h('p', {}, type === 'tune' ? `No tune titles match “${q}”.` : `No ${TYPE_UI[type].plural} match “${q}”.`),
+    h('p', {}, T.noMatch(type, q)),
   ];
   const paint = (extra: HTMLElement[]) => main.replaceChildren(h('div', { class: 'state no-match' }, ...head, ...extra, h('p', { class: 'muted' }, tip), h('p', {}, edit)));
   paint([h('p', { class: 'muted' }, 'Looking in riddims, tunes, artists and labels…')]);
@@ -1055,7 +1053,7 @@ async function renderNoMatch(q: string, type: SearchType, tip: string, signal: A
     }),
   );
   paint([
-    h('p', { class: 'did-you-mean' }, 'Did you mean:'),
+    h('p', { class: 'did-you-mean' }, T.didYouMean),
     h('ul', { class: 'suggest' }, ...items.slice(0, SUGGEST_MAX).map((i) => i.el)),
     again,
   ]);
@@ -1227,7 +1225,7 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
 
   // ---- controls: live filter (Artist / Title / Label)
   const controls = h('form', { class: 'controls', role: 'search', 'aria-label': 'Filter this list' });
-  const filterLabel = kind === 'label' ? 'Filter by artist or title' : 'Filter by artist, title or label';
+  const filterLabel = T.filter(kind === 'label');
   const filter = h('input', {
     type: 'search', name: 'f', placeholder: filterLabel, 'aria-label': filterLabel,
     maxlength: 100, value: route.f, autocomplete: 'off', spellcheck: 'false', enterkeyhint: 'done',
@@ -1293,8 +1291,8 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
     parts.push(q ? `${shown} of ${t ?? held} tunes match “${q}”` : t != null ? `${held} of ${t} tunes` : `${held} tunes`);
     const active = table.sort();
     if (active) parts.push(`sorted by ${SORT_NAMES[active.key]} ${active.dir === 'asc' ? '▲' : '▼'}`);
-    if (bulk) parts.push(`loading all tunes… ${held}${t != null ? `/${Math.min(t, CAP)}` : ''}`);
-    else if (failed) parts.push('could not load every tune — try again');
+    if (bulk) parts.push(T.loadingAll(held, t != null ? Math.min(t, CAP) : null));
+    else if (failed) parts.push(T.loadFailed);
     else if (cursor && held >= CAP) parts.push(`showing the first ${CAP.toLocaleString('en')}`);
     count.textContent = parts.join(' · ');
     // Everything loads on its own; "Load more" is left as the retry after a failure.
@@ -1412,7 +1410,7 @@ function renderWant() {
   const count = h('p', { class: 'count', role: 'status' });
   const setCount = () => {
     const n = wants.length;
-    count.textContent = n ? `${n} tune${n === 1 ? '' : 's'} · saved in this browser only` : 'Saved in this browser only';
+    count.textContent = T.savedCount(n, false);
   };
   setCount();
 
@@ -1426,7 +1424,7 @@ function renderWant() {
   const rows = items.map(snapshotRow);
   const body = rows.length
     ? tuneTable(rows).el
-    : h('p', { class: 'state' }, 'Nothing here yet. Press ', h('span', { class: 'want-star', 'aria-hidden': 'true' }, '☆'), ' Want on any tune to keep it here.');
+    : h('p', { class: 'state' }, T.wantEmpty[0], h('span', { class: 'want-star', 'aria-hidden': 'true' }, '☆'), T.wantEmpty[1]);
   // Keep the count in step while tunes are removed / re-added on this page.
   onWantChange = setCount;
   main.replaceChildren(head, count, body);
@@ -1475,14 +1473,14 @@ function renderDig() {
   const count = h('p', { class: 'count', role: 'status' });
   const setCount = () => {
     const n = digs.length;
-    count.textContent = n ? `${n} tune${n === 1 ? '' : 's'} · last searched first · saved in this browser only` : 'Saved in this browser only';
+    count.textContent = T.savedCount(n, true);
   };
   setCount();
-  const empty = () => h('p', { class: 'state' }, 'Nothing here yet. Searches you open from Dig are kept here.');
+  const empty = () => h('p', { class: 'state' }, T.digEmpty);
 
   const clear = h('button', { type: 'button', class: 'act act-clear' }, h('span', { class: 'act-ico' }, icon('x', 16)), h('span', { class: 'act-text' }, 'Clear history'));
   clear.addEventListener('click', () => {
-    if (!digs.length || !confirm('Clear the whole Dig history? Your Want list stays as it is.')) return;
+    if (!digs.length || !confirm(T.clearConfirm)) return;
     digs = [];
     saveDigs();
     setCount();
@@ -1575,7 +1573,7 @@ form.addEventListener('submit', (e) => {
   e.preventDefault();
   const q = input.value.replace(/\s+/g, ' ').trim();
   if (q.length < 2) {
-    input.setCustomValidity('Type at least 2 characters.');
+    input.setCustomValidity(T.minChars);
     input.reportValidity();
     return;
   }
@@ -1651,5 +1649,39 @@ window.addEventListener('popstate', () => {
   returnedId = typeof history.state?.from === 'number' ? history.state.from : null;
   render();
 });
+// ---------- static texts and the footer language switch ----------
+/** Texts that live in index.html (English there, for the server-rendered page). */
+function applyStaticTexts() {
+  const hint = document.getElementById('hint');
+  if (hint) {
+    const [a, k1, b, k2, c] = T.hint;
+    hint.replaceChildren(a, h('kbd', {}, k1), b, h('kbd', {}, k2), c);
+  }
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('.foot-lang button')) btn.setAttribute('aria-pressed', String(btn.dataset.lang === lang));
+}
+
+function setLang(next: Lang) {
+  lang = next;
+  T = stringsFor(lang);
+  try {
+    localStorage.setItem(LANG_KEY, lang);
+  } catch {
+    /* the choice just won't be remembered */
+  }
+  applyStaticTexts();
+  showType(currentType());
+  render();
+}
+
+document.querySelector('.foot-inner')?.appendChild(
+  h('p', { class: 'foot-lang', role: 'group', 'aria-label': 'Language for notes and hints' },
+    ...(['en', 'ja'] as const).map((l, i) => {
+      const b = h('button', { type: 'button', 'data-lang': l, lang: l, 'aria-pressed': String(l === lang) }, l === 'en' ? 'English' : '日本語');
+      b.addEventListener('click', () => setLang(l));
+      return i ? [' / ', b] : [b];
+    }).flat(),
+  ),
+);
+applyStaticTexts();
 showType(storedType());
 render();

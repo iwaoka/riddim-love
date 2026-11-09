@@ -355,6 +355,12 @@ th[aria-sort="ascending"] .sort-ind .down, th[aria-sort="descending"] .sort-ind 
 /* three centred lines on every screen: RIDDIM.LOVE / Built for selectors. / Data provided by Riddim-ID. */
 .foot-inner, .foot-left { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
 .foot p { margin: 0; }
+/* English / 日本語: language for notes and hints */
+.foot-lang { margin-top: 6px !important; color: var(--fg-3); }
+.foot-lang button { all: unset; cursor: pointer; padding: 2px 4px; border-radius: 4px; color: var(--fg-2); }
+.foot-lang button:hover { color: var(--fg); text-decoration: underline; }
+.foot-lang button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.foot-lang button[aria-pressed="true"] { color: var(--fg); font-weight: 700; }
 .foot-brand { font-weight: 800; letter-spacing: 0.04em; color: var(--fg); }
 .foot a { color: var(--fg); }
 .foot a:hover { color: var(--accent); }
