@@ -11,5 +11,5 @@
     "isolatedModules": true,
     "noUnusedLocals": true
   },
-  "include": ["src/**/*.ts", "shared/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "shared/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"]
 }

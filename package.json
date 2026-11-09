@@ -9,7 +9,8 @@
     "preview": "npm run build && wrangler dev",
     "test": "vitest run",
     "deploy": "npm run build && wrangler deploy",
-    "deploy:www": "wrangler deploy -c www-redirect/wrangler.jsonc"
+    "deploy:www": "wrangler deploy -c www-redirect/wrangler.jsonc",
+    "sitemap": "node scripts/sitemap.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261106.1",

@@ -252,7 +252,12 @@ export default {
       const redirect = canonicalRedirect(request, url);
       if (redirect) return redirect;
       if (url.pathname === "/") return markVisitor(request, url, env, await serveShell(env, url, request));
-      if (url.pathname === '/sitemap.xml') return serveSitemap(ctx);
+      if (url.pathname === '/sitemap.xml') {
+        // The pre-built sitemap index (scripts/sitemap.mjs, deployed as a static
+        // file); the Worker-built top-900 sitemap only if that file is missing.
+        const prebuilt = await env.ASSETS.fetch(request);
+        return prebuilt.ok ? prebuilt : serveSitemap(ctx);
+      }
       if (url.pathname === '/want') return markVisitor(request, url, env, await serveWant(env, url, request));
       const page = parsePagePath(url.pathname);
       if (page) return markVisitor(request, url, env, await servePage(request, env, ctx, url, page));

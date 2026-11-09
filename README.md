@@ -28,7 +28,10 @@ Data provided by [Riddim-ID](https://riddim-id.com/) via its public API v1. RIDD
 
 - Detail pages are server-rendered by the Worker (`worker/pages.ts`): real `<title>`, description, canonical, H1, the first 100 tunes as HTML, and JSON-LD that mirrors the page (BreadcrumbList + CollectionPage/ItemList, MusicGroup, Organization/Person, MusicRecording). The page embeds the API data it used, so the app starts without refetching.
 - Indexed: home, riddim, artist, producer, label pages. `noindex, follow`: tune pages (thin), search views (`/?q=`). Filter/sort params keep the base canonical. Unknown ids → 404 (noindex); wrong/missing slug → 301.
-- `/sitemap.xml`: home + top 500 riddims, 200 labels, 200 artists by tune count — 9 upstream list requests, cached for a day. No catalogue crawling.
+- Sitemap: `/sitemap.xml` is a sitemap index over static files in `/sitemaps/` (`pages`, `riddim`, `artist`, `label`, `producer`), pre-built by `npm run sitemap` (`scripts/sitemap.mjs`, rules in `scripts/sitemap-lib.ts`) and committed, so every deploy ships the last good set and serving it calls no API.
+  - Listed: detail pages with at least 2 tunes (riddims) or 3 tunes (artists, labels, producers); placeholder records (`[Dub]`, `~Unknown (027)`) left out; canonical URLs only; no `lastmod` (no reliable per-page update time upstream). 2026-11-09: 16,355 URLs.
+  - The build reads the list endpoints sorted by tune count and stops once the sort count is under the minimum: ~175 requests, one per second (~3 min), 429 `Retry-After` honoured. It writes nothing unless the run completes and passes its checks (well-formed, ≤ 50,000 URLs per file, no duplicates, riddim.love URLs only, no kind under 80% of the previous run), so a failed run keeps the last good set.
+  - Refresh now and then (e.g. weekly): `npm run sitemap`, commit, deploy. If the static index is missing, the Worker still builds the old top-900 sitemap (`worker/sitemap.ts`).
 - workers.dev and plain-http visitors → 301 to https://riddim.love.
 
 ## Stack
