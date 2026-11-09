@@ -23,7 +23,12 @@ describe('format', () => {
   it('youtube url is encoded', () => {
     expect(youtubeUrl('A & B #1 / ?x')).toBe('https://www.youtube.com/results?search_query=A%20%26%20B%20%231%20%2F%20%3Fx');
   });
-  it('no affiliate or tracking parameters on YouTube', () => {
+  it('apple music searches "Artist Title" in the visitor’s store', () => {
+    expect(externalSearchUrl('applemusic', ws, 'Under Mi Sleng Teng', 'JP')).toBe('https://music.apple.com/jp/search?term=Wayne%20Smith%20Under%20Mi%20Sleng%20Teng');
+    expect(externalSearchUrl('applemusic', ws, 'Under Mi Sleng Teng', null)).toBe('https://music.apple.com/search?term=Wayne%20Smith%20Under%20Mi%20Sleng%20Teng');
+    expect(externalSearchUrl('applemusic', ws, 'X', '../evil')).toBe('https://music.apple.com/search?term=Wayne%20Smith%20X');
+  });
+  it('no affiliate or tracking parameters on any external search', () => {
     for (const s of EXTERNAL_SEARCHES) expect([...new URL(s.url('x')).searchParams.keys()]).toHaveLength(1);
   });
 });

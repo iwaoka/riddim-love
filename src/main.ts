@@ -264,6 +264,7 @@ const ICONS = {
   play: ['poly:6 3 20 12 6 21 6 3'],
   disc: ['circle:12,12,10', 'circle:12,12,2'],
   share: ['M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8', 'M16 6l-4-4-4 4', 'M12 2v13'],
+  music: ['M9 18V5l12-2v13', 'circle:6,18,3', 'circle:18,16,3'],
   star: ['poly:12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'],
 } as const;
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -333,6 +334,24 @@ function youtubeButton(row: Pick<Row, 'artists' | 'title'>): HTMLAnchorElement {
     title: label,
     'aria-label': label,
   }, icon('play', 13), actLabel('YouTube', true));
+}
+
+/**
+ * Apple Music search for "Artist Title" in the visitor's own store (new tab;
+ * opens the Music app where installed). Icon only in tune rows, so the
+ * Riddim / Label columns keep their width; labelled on the tune page.
+ */
+function appleMusicButton(row: Pick<Row, 'artists' | 'title'>, withText = false): HTMLAnchorElement {
+  const query = searchText(row.artists, row.title);
+  const label = `Search Apple Music for “${query}” (opens in a new tab)`;
+  return h('a', {
+    href: externalSearchUrl('applemusic', row.artists, row.title, visitorCountry),
+    target: '_blank',
+    rel: 'noopener noreferrer',
+    class: 'act act-am',
+    title: label,
+    'aria-label': label,
+  }, h('span', { class: 'act-ico' }, icon('music', 16)), withText ? h('span', { class: 'act-text' }, 'Apple Music') : null);
 }
 
 /**
@@ -597,9 +616,9 @@ function digButton(row: Pick<Row, 'artists' | 'title'>): HTMLButtonElement {
   return btn;
 }
 
-/** YouTube → Copy → Dig → Want. Tune details are reached by clicking the title. */
+/** YouTube → Apple Music → Copy → Dig → Want. Tune details are reached by clicking the title. */
 function rowActions(row: Row): HTMLElement[] {
-  return [youtubeButton(row), copyButton(copyText(row.artists, row.title)), digButton(row), wantButton(row)];
+  return [youtubeButton(row), appleMusicButton(row), copyButton(copyText(row.artists, row.title)), digButton(row), wantButton(row)];
 }
 
 type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean };
@@ -1273,7 +1292,7 @@ async function renderTune(id: number, signal: AbortSignal) {
       h('h1', { class: 'at' }, text),
       h('dl', {}, ...rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, ...v)])),
       // Dig is laid out open here (no menu to open): one click to a shop.
-      h('p', { class: 'acts acts-lg' }, youtubeButton(t), copyButton(copyText(t.artists, t.title)), wantButton(t, true), shareButton(text, ORIGIN + tunePath(t))),
+      h('p', { class: 'acts acts-lg' }, youtubeButton(t), appleMusicButton(t, true), copyButton(copyText(t.artists, t.title)), wantButton(t, true), shareButton(text, ORIGIN + tunePath(t))),
       digLinks(t),
     ),
   );
