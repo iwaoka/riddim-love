@@ -53,6 +53,13 @@ export const DIG_PROVIDERS: readonly DigProvider[] = [
     countries: [...REGIONS.JAPAN],
     buildSearchUrl: (q) => `https://auctions.yahoo.co.jp/search/search?p=${encodeURIComponent(q)}`,
   },
+  {
+    id: 'recordcity',
+    name: 'Record City',
+    countries: [...REGIONS.JAPAN],
+    // Catalogue search; the site's own form also sends a session _token, which a plain GET does not need.
+    buildSearchUrl: (q) => `https://www.recordcity.jp/ja/catalog?keyword=${encodeURIComponent(q)}`,
+  },
 ];
 
 /** "jp" → "JP"; anything that is not a real two-letter code (XX, T1, "", null) → null. */
