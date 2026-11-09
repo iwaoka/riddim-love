@@ -228,17 +228,17 @@ async function serveShell(env: Env, url: URL, request: Request): Promise<Respons
 }
 
 /**
- * /want: the visitor's want list, kept in their own browser — the page is the
+ * /want and /dig: the visitor's Want list and Dig history, kept in their own browser — the page is the
  * plain app shell (the app fills it from localStorage). Private: noindex, no canonical.
  */
-async function serveWant(env: Env, url: URL, request: Request): Promise<Response> {
+async function serveWant(env: Env, url: URL, request: Request, title: string): Promise<Response> {
   const res = await env.ASSETS.fetch(new Request(new URL('/', url), request));
   if (res.status !== 200) return res;
   const out = new Response(res.body, res);
   out.headers.set('X-Robots-Tag', 'noindex, nofollow');
   return new HTMLRewriter()
     .on('link[rel="canonical"]', { element(el) { el.remove(); } })
-    .on('title', { element(el) { el.setInnerContent('Want list | RIDDIM.LOVE'); } })
+    .on('title', { element(el) { el.setInnerContent(title); } })
     .transform(out);
 }
 
@@ -258,7 +258,8 @@ export default {
         const prebuilt = await env.ASSETS.fetch(request);
         return prebuilt.ok ? prebuilt : serveSitemap(ctx);
       }
-      if (url.pathname === '/want') return markVisitor(request, url, env, await serveWant(env, url, request));
+      if (url.pathname === '/want') return markVisitor(request, url, env, await serveWant(env, url, request, 'Want list | RIDDIM.LOVE'));
+      if (url.pathname === '/dig') return markVisitor(request, url, env, await serveWant(env, url, request, 'Dig history | RIDDIM.LOVE'));
       const page = parsePagePath(url.pathname);
       if (page) return markVisitor(request, url, env, await servePage(request, env, ctx, url, page));
       return env.ASSETS.fetch(request);

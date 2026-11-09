@@ -6,7 +6,7 @@ import { altNames, labelMeta, ORIGIN, ORIGINAL_TUNES_MAX, originalTuneText, pars
 import { filterWords, matches } from '../shared/filter';
 import { sameName, splitArtistTitle, splitByArtistPrefix, splitByArtistSuffix, swapArtistTitle, type ArtistTitle } from '../shared/pair';
 import { formatSort, parseSort, sortRows, type SortDir, type SortKey } from '../shared/sort';
-import { parseWant, toWantItem, WANT_KEY, WANT_MAX, wantText, type WantItem } from '../shared/want';
+import { DIG_KEY, parseDig, parseWant, recordDig, removeDig, toWantItem, WANT_KEY, WANT_MAX, wantText, type DigItem, type TuneSnapshot, type WantItem } from '../shared/want';
 
 const HOME_TITLE = 'RIDDIM.LOVE — Riddim search for reggae & dancehall selectors';
 const HOME_DESCRIPTION =
@@ -85,7 +85,8 @@ type Route =
   | { view: 'search'; q: string; type: SearchType }
   | { view: 'list'; kind: ListKind; id: number; f: string; sort: { key: SortKey; dir: SortDir } | null }
   | { view: 'tune'; id: number }
-  | { view: 'want' };
+  | { view: 'want' }
+  | { view: 'dig' };
 
 const LIST_KINDS: ListKind[] = ['riddim', 'artist', 'producer', 'label'];
 const ID_RE = /^[1-9]\d{0,8}$/;
@@ -93,6 +94,7 @@ const ID_RE = /^[1-9]\d{0,8}$/;
 function parseRoute(loc: { pathname: string; search: string }): Route {
   const p = new URLSearchParams(loc.search);
   if (/^\/want\/?$/.test(loc.pathname)) return { view: 'want' };
+  if (/^\/dig\/?$/.test(loc.pathname)) return { view: 'dig' };
   const page = parsePagePath(loc.pathname);
   if (page) {
     if (page.kind === 'tune') return { view: 'tune', id: page.id };
@@ -442,13 +444,46 @@ function wantButton(row: Row, withText = false): HTMLButtonElement {
 
 loadWants();
 showWantCount();
-wantNav?.addEventListener('click', (e) => {
-  if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return;
-  e.preventDefault();
-  navigate('/want');
-});
-// Another tab changed the list: follow it.
+// ---------- Dig history (this browser only; see shared/want.ts) ----------
+let digs: DigItem[] = [];
+function loadDigs() {
+  try {
+    digs = parseDig(localStorage.getItem(DIG_KEY));
+  } catch {
+    digs = [];
+  }
+}
+function saveDigs(): boolean {
+  try {
+    localStorage.setItem(DIG_KEY, JSON.stringify(digs));
+    return true;
+  } catch {
+    return false;
+  }
+}
+/** A Dig search link was tapped: note the tune. Never stands in the link's way. */
+function noteDig(row: Row, service: string) {
+  try {
+    loadDigs(); // another tab may have added some
+    digs = recordDig(digs, row, service);
+    saveDigs();
+  } catch {
+    /* history is a convenience; the search still opens */
+  }
+}
+loadDigs();
+
+const digNav = document.getElementById('dig-nav') as HTMLAnchorElement | null;
+for (const [el, path] of [[wantNav, '/want'], [digNav, '/dig']] as const) {
+  el?.addEventListener('click', (e) => {
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    navigate(path);
+  });
+}
+// Another tab changed a list: follow it.
 window.addEventListener('storage', (e) => {
+  if (e.key === DIG_KEY || e.key === null) loadDigs();
   if (e.key !== WANT_KEY && e.key !== null) return;
   loadWants();
   syncWantButtons();
@@ -582,13 +617,22 @@ const MENU = {
 } as const;
 
 /** Search links for a menu, in config order: Dig shops for this country, or the Listen services. */
-function menuLinks(kind: MenuKind, query: string): { name: string; url: string }[] {
+function menuLinks(kind: MenuKind, query: string): { id: string; name: string; url: string }[] {
   return kind === 'dig'
-    ? digProviders.map((s) => ({ name: s.name, url: s.buildSearchUrl(query) }))
-    : LISTEN_PROVIDERS.map((s) => ({ name: s.name, url: s.buildSearchUrl(query, visitorCountry) }));
+    ? digProviders.map((s) => ({ id: s.id, name: s.name, url: s.buildSearchUrl(query) }))
+    : LISTEN_PROVIDERS.map((s) => ({ id: s.id, name: s.name, url: s.buildSearchUrl(query, visitorCountry) }));
 }
 
-function openDig(btn: HTMLButtonElement, row: Pick<Row, 'artists' | 'title'>, focusFirst: boolean, kind: MenuKind = 'dig') {
+/** Tap on a Listen / Dig search link: Dig notes the tune in the history; phones also copy the words. */
+function onSearchLink(kind: MenuKind, row: Row, service: string, query: string): EventListener {
+  const keep = keepQuery(query);
+  return (e) => {
+    if (kind === 'dig') noteDig(row, service);
+    keep(e);
+  };
+}
+
+function openDig(btn: HTMLButtonElement, row: Row, focusFirst: boolean, kind: MenuKind = 'dig') {
   closeDig(false);
   const menu = ensureDigMenu();
   const query = searchText(row.artists, row.title);
@@ -603,7 +647,7 @@ function openDig(btn: HTMLButtonElement, row: Pick<Row, 'artists' | 'title'>, fo
         target: '_blank',
         rel: 'noopener noreferrer',
         title: `Search ${l.name} for “${query}” (opens in a new tab)`,
-        onclick: keepQuery(query),
+        onclick: onSearchLink(kind, row, l.id, query),
       }, h('span', { class: 'dig-name' }, l.name), h('span', { class: 'dig-host', 'aria-hidden': 'true' }, new URL(l.url).hostname.replace(/^(www|open)\./, ''))),
     ),
   );
@@ -616,7 +660,7 @@ function openDig(btn: HTMLButtonElement, row: Pick<Row, 'artists' | 'title'>, fo
 }
 
 /** A menu's links laid out open (tune page): same services and query as the row menu. */
-function menuLinksOpen(kind: MenuKind, row: Pick<Row, 'artists' | 'title'>): HTMLElement {
+function menuLinksOpen(kind: MenuKind, row: Row): HTMLElement {
   const m = MENU[kind];
   const query = searchText(row.artists, row.title);
   return h('div', { class: 'dig-open', role: 'group', 'aria-label': `${m.name}: ${m.what} for “${query}”` },
@@ -630,7 +674,7 @@ function menuLinksOpen(kind: MenuKind, row: Pick<Row, 'artists' | 'title'>): HTM
           target: '_blank',
           rel: 'noopener noreferrer',
           title: `Search ${l.name} for “${query}” (opens in a new tab)`,
-          onclick: keepQuery(query),
+          onclick: onSearchLink(kind, row, l.id, query),
         }, h('span', { class: 'act-text' }, l.name)),
       ),
     ),
@@ -638,7 +682,7 @@ function menuLinksOpen(kind: MenuKind, row: Pick<Row, 'artists' | 'title'>): HTM
 }
 
 /** Row button that opens the Dig or Listen menu. */
-function menuButton(kind: MenuKind, row: Pick<Row, 'artists' | 'title'>): HTMLButtonElement {
+function menuButton(kind: MenuKind, row: Row): HTMLButtonElement {
   const m = MENU[kind];
   const query = searchText(row.artists, row.title);
   const label = `${m.name}: ${m.what} for “${query}”`;
@@ -669,7 +713,7 @@ function rowActions(row: Row): HTMLElement[] {
   return [youtubeButton(row), menuButton('listen', row), menuButton('dig', row), copyButton(copyText(row.artists, row.title)), wantButton(row)];
 }
 
-type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean };
+type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean; /** One more action at the end of each row (e.g. remove from Dig history). */ extra?: (row: Row) => HTMLElement };
 
 function tuneRow(row: Row, opts: TableOpts = {}): HTMLTableRowElement {
   const dash = () => h('span', { class: 'muted' }, '—');
@@ -685,7 +729,7 @@ function tuneRow(row: Row, opts: TableOpts = {}): HTMLTableRowElement {
     opts.hideRiddim ? null : h('td', { class: 'c-riddim' }, row.riddim ? row.riddim.name : dash()),
     opts.hideLabel ? null : h('td', { class: 'c-label' }, row.label ? row.label.name : dash()),
     h('td', { class: 'c-year' }, row.year ? String(row.year) : ''),
-    h('td', { class: 'c-act' }, h('span', { class: 'acts' }, ...rowActions(row))),
+    h('td', { class: 'c-act' }, h('span', { class: 'acts' }, ...rowActions(row), opts.extra ? opts.extra(row) : null)),
   );
 }
 
@@ -730,6 +774,8 @@ interface TuneTable {
   setFilter(query: string): void;
   /** Rows held / rows currently shown. */
   counts(): { held: number; shown: number };
+  /** Drops a tune's row (keeps sort and filter). */
+  remove(id: number): void;
 }
 
 /**
@@ -821,6 +867,12 @@ function tuneTable(
       paint();
     },
     counts: () => ({ held: all.length, shown }),
+    remove(id) {
+      const i = all.findIndex((r) => r.id === id);
+      if (i < 0) return;
+      all.splice(i, 1);
+      paint();
+    },
   };
 }
 
@@ -1364,32 +1416,14 @@ function renderWant() {
   };
   setCount();
 
-  // Copy the whole list as plain lines for a memo app.
-  const copyAll = h('button', { type: 'button', class: 'act act-copy act-copy-all' }, h('span', { class: 'act-ico' }, icon('copy', 16)), h('span', { class: 'act-text' }, 'Copy list as text'));
-  copyAll.addEventListener('click', async () => {
-    const current = wants; // what is still wanted now, newest first
-    const ok = current.length > 0 && (await copyToClipboard(wantText(current)));
-    copyAll.classList.toggle('done', ok);
-    copyAll.classList.toggle('fail', !ok);
-    (copyAll.lastChild as HTMLElement).textContent = ok ? `Copied ${current.length} line${current.length === 1 ? '' : 's'}` : current.length ? 'Copy failed' : 'Nothing to copy';
-    announce((copyAll.lastChild as HTMLElement).textContent!);
-    window.setTimeout(() => {
-      copyAll.classList.remove('done', 'fail');
-      (copyAll.lastChild as HTMLElement).textContent = 'Copy list as text';
-    }, 1800);
-  });
+  const copyAll = copyListButton(() => wants); // what is still wanted now, newest first
 
   const head = h('header', { class: 'list-head' },
     h('div', { class: 'head-top' }, h('p', { class: 'kind' }, 'Want')),
     h('h1', {}, 'Want list'),
     h('p', { class: 'acts acts-lg want-tools' }, copyAll),
   );
-  const rows: Row[] = items.map((w) => ({
-    id: w.id, title: w.title, year: w.year,
-    artists: w.artists.map((a) => ({ ...a, url: null })),
-    riddim: w.riddim ? { ...w.riddim, url: null, version_of: null } : null,
-    label: w.label ? { ...w.label, url: null } : null,
-  }));
+  const rows = items.map(snapshotRow);
   const body = rows.length
     ? tuneTable(rows).el
     : h('p', { class: 'state' }, 'Nothing here yet. Press ', h('span', { class: 'want-star', 'aria-hidden': 'true' }, '☆'), ' Want on any tune to keep it here.');
@@ -1397,6 +1431,88 @@ function renderWant() {
   onWantChange = setCount;
   main.replaceChildren(head, count, body);
   announce(`Want list: ${count.textContent}`);
+}
+
+/** A stored tune (Want / Dig) as a table row. */
+function snapshotRow(w: TuneSnapshot): Row {
+  return {
+    id: w.id, title: w.title, year: w.year,
+    artists: w.artists.map((a) => ({ ...a, url: null })),
+    riddim: w.riddim ? { ...w.riddim, url: null, version_of: null } : null,
+    label: w.label ? { ...w.label, url: null } : null,
+  };
+}
+
+/** "Copy list as text": the list's tunes as plain lines for a memo app. */
+function copyListButton(items: () => readonly TuneSnapshot[]): HTMLButtonElement {
+  const text = h('span', { class: 'act-text' }, 'Copy list as text');
+  const btn = h('button', { type: 'button', class: 'act act-copy act-copy-all' }, h('span', { class: 'act-ico' }, icon('copy', 16)), text);
+  btn.addEventListener('click', async () => {
+    const current = items();
+    const ok = current.length > 0 && (await copyToClipboard(wantText(current)));
+    btn.classList.toggle('done', ok);
+    btn.classList.toggle('fail', !ok);
+    text.textContent = ok ? `Copied ${current.length} line${current.length === 1 ? '' : 's'}` : current.length ? 'Copy failed' : 'Nothing to copy';
+    announce(text.textContent);
+    window.setTimeout(() => {
+      btn.classList.remove('done', 'fail');
+      text.textContent = 'Copy list as text';
+    }, 1800);
+  });
+  return btn;
+}
+
+/**
+ * Dig history: tunes whose record-shop search was opened from Dig, last
+ * searched first. Same table as Want (☆ moves a tune to Want in one tap, Dig
+ * searches again), plus ✕ to drop one; "Clear history" empties it (asks
+ * first). Want and Dig never touch each other's data.
+ */
+function renderDig() {
+  setHead('Dig history | RIDDIM.LOVE', 'Tunes you searched record shops for, kept in this browser.', null);
+  input.value = '';
+  loadDigs();
+  const count = h('p', { class: 'count', role: 'status' });
+  const setCount = () => {
+    const n = digs.length;
+    count.textContent = n ? `${n} tune${n === 1 ? '' : 's'} · last searched first · saved in this browser only` : 'Saved in this browser only';
+  };
+  setCount();
+  const empty = () => h('p', { class: 'state' }, 'Nothing here yet. Searches you open from Dig are kept here.');
+
+  const clear = h('button', { type: 'button', class: 'act act-clear' }, h('span', { class: 'act-ico' }, icon('x', 16)), h('span', { class: 'act-text' }, 'Clear history'));
+  clear.addEventListener('click', () => {
+    if (!digs.length || !confirm('Clear the whole Dig history? Your Want list stays as it is.')) return;
+    digs = [];
+    saveDigs();
+    setCount();
+    body.replaceWith((body = empty()));
+    announce('Dig history cleared');
+  });
+  const head = h('header', { class: 'list-head' },
+    h('div', { class: 'head-top' }, h('p', { class: 'kind' }, 'Dig')),
+    h('h1', {}, 'Dig history'),
+    h('p', { class: 'acts acts-lg want-tools' }, copyListButton(() => digs), clear),
+  );
+
+  const removeButton = (row: Row) => {
+    const label = `Remove “${row.title}” from Dig history`;
+    const b = h('button', { type: 'button', class: 'act act-remove', title: 'Remove from Dig history', 'aria-label': label }, h('span', { class: 'act-ico' }, icon('x', 16)));
+    b.addEventListener('click', () => {
+      loadDigs();
+      digs = removeDig(digs, row.id);
+      saveDigs();
+      table?.remove(row.id);
+      setCount();
+      announce(`Removed from Dig history: ${row.title}`);
+      if (!digs.length) body.replaceWith((body = empty()));
+    });
+    return b;
+  };
+  const table = digs.length ? tuneTable(digs.map(snapshotRow), { extra: removeButton }) : null;
+  let body: HTMLElement = table ? table.el : empty();
+  main.replaceChildren(head, count, body);
+  announce(`Dig history: ${count.textContent}`);
 }
 
 // ---------- render loop ----------
@@ -1423,8 +1539,10 @@ async function render() {
   navController = ctrl;
   const route = parseRoute(location);
   document.body.classList.toggle('home', route.view === 'home');
-  if (route.view === 'want') wantNav?.setAttribute('aria-current', 'page');
-  else wantNav?.removeAttribute('aria-current');
+  for (const [el, view] of [[wantNav, 'want'], [digNav, 'dig']] as const) {
+    if (route.view === view) el?.setAttribute('aria-current', 'page');
+    else el?.removeAttribute('aria-current');
+  }
   if (route.view === 'home' || route.view === 'search') {
     showType(route.type);
     // Keep the URL canonical (e.g. a missing or unknown ?type=) so it can be shared as-is.
@@ -1437,6 +1555,7 @@ async function render() {
     else if (route.view === 'search') await renderSearch(route.q, route.type, ctrl.signal);
     else if (route.view === 'list') await renderList(route, ctrl.signal);
     else if (route.view === 'want') renderWant();
+    else if (route.view === 'dig') renderDig();
     else await renderTune(route.id, ctrl.signal);
     if (!ctrl.signal.aborted) restoreScroll();
     trackPageView(ctrl.signal);

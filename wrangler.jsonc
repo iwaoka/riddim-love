@@ -14,7 +14,7 @@
     // /assets/*, /og.png, /robots.txt, /sitemaps/*.xml stay pure static.
     // /sitemap.xml runs the Worker only to fall back: it serves the pre-built
     // file (`npm run sitemap`) and builds the small one if that is missing.
-    "run_worker_first": ["/api/*", "/", "/sitemap.xml", "/riddim/*", "/artist/*", "/producer/*", "/label/*", "/tune/*", "/want"]
+    "run_worker_first": ["/api/*", "/", "/sitemap.xml", "/riddim/*", "/artist/*", "/producer/*", "/label/*", "/tune/*", "/want", "/dig"]
   },
   "routes": [{ "pattern": "riddim.love", "custom_domain": true }],
   "workers_dev": true,

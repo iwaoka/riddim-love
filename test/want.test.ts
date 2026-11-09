@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseWant, toWantItem, WANT_MAX, wantLine, wantText } from '../shared/want';
+import { DIG_KEY, DIG_MAX, parseDig, parseWant, recordDig, removeDig, toWantItem, WANT_MAX, wantLine, wantText } from '../shared/want';
 
 const tune = {
   id: 759, title: 'Under Mi Sleng Teng', year: 1985, is_original: true,
@@ -44,5 +44,37 @@ describe('want list', () => {
   it('caps the list', () => {
     const many = Array.from({ length: WANT_MAX + 5 }, (_, i) => ({ ...toWantItem(tune), id: i + 1 }));
     expect(parseWant(JSON.stringify(many))).toHaveLength(WANT_MAX);
+  });
+});
+
+describe('dig history', () => {
+  const other = { ...tune, id: 760, title: 'Under Mi Sleng Teng' }; // same artist + title, another tune id
+
+  it('one entry per tune id: a repeat search moves it to the top with the new time and shop', () => {
+    let list = recordDig([], tune, 'discogs', 100);
+    list = recordDig(list, other, 'ebay', 200);
+    expect(list.map((d) => [d.id, d.dug, d.service])).toEqual([[760, 200, 'ebay'], [759, 100, 'discogs']]);
+    list = recordDig(list, tune, 'mercari', 300);
+    expect(list.map((d) => [d.id, d.dug, d.service])).toEqual([[759, 300, 'mercari'], [760, 200, 'ebay']]);
+    expect(list[0]).toMatchObject({ title: 'Under Mi Sleng Teng', label: { id: 61, name: "Jammy's" }, riddim: { id: 18, name: 'Sleng Teng' } });
+    expect('added' in list[0]).toBe(false);
+  });
+
+  it('removes one tune, caps the history, and reads back newest first', () => {
+    let list = recordDig([], tune, 'discogs', 1);
+    list = recordDig(list, other, 'ebay', 2);
+    expect(removeDig(list, 759).map((d) => d.id)).toEqual([760]);
+    const many = Array.from({ length: DIG_MAX + 3 }, (_, i) => ({ ...tune, id: i + 1 })).reduce((l, t, i) => recordDig(l, t, 'discogs', i), [] as ReturnType<typeof parseDig>);
+    expect(many).toHaveLength(DIG_MAX);
+    expect(many[0].id).toBe(DIG_MAX + 3);
+    const stored = JSON.stringify([{ ...list[1] }, { ...list[0] }, { id: 'bad' }, { ...list[0], service: 'Bad Service!' }]);
+    expect(parseDig(stored).map((d) => [d.id, d.service])).toEqual([[760, 'ebay'], [759, 'discogs']]);
+    expect(parseDig('nope')).toEqual([]);
+  });
+
+  it('never reads the Want key, and Want data still reads as before', () => {
+    expect(DIG_KEY).not.toBe('riddim.love:want');
+    const w = toWantItem(tune, 5);
+    expect(parseWant(JSON.stringify([w]))).toEqual([w]);
   });
 });

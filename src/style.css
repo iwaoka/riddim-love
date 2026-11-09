@@ -150,18 +150,21 @@ body.home .credit { display: block; margin: -4px 0 0; text-align: center; font-s
 .tagline { display: none; margin: -10px 0 4px; color: var(--fg-2); }
 body.home .tagline { display: block; }
 
-/* Want list link: end of the header row; top-right corner on home */
-.want-nav {
+/* Dig | Want: the visitor's lists, end of the header row; top-right corner on home */
+.lists-nav {
   order: 4; margin-left: auto; flex: none;
-  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px;
+  display: inline-flex; gap: 2px; padding: 2px;
   border: 1px solid var(--line-strong); border-radius: 99px; background: var(--surface-2);
+}
+.lists-nav a {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 99px;
   color: var(--fg-2); font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap;
 }
-.want-nav:hover { color: var(--fg); border-color: var(--fg-3); }
-.want-nav:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.want-nav[aria-current="page"] { color: var(--fg); border-color: var(--accent); background: var(--accent-soft); }
+.lists-nav a:hover { color: var(--fg); background: var(--surface); }
+.lists-nav a:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.lists-nav a[aria-current="page"] { color: var(--fg); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .want-n:not(:empty) { min-width: 20px; padding: 1px 6px; border-radius: 99px; background: var(--accent); color: var(--accent-fg); font-size: 12px; line-height: 18px; text-align: center; }
-body.home .want-nav { position: absolute; top: 12px; right: max(16px, calc((100% - 1200px) / 2 + 16px)); }
+body.home .lists-nav { position: absolute; top: 12px; right: max(16px, calc((100% - 1200px) / 2 + 16px)); }
 body.home main { display: none; }
 
 /* ---------- main ---------- */
@@ -362,7 +365,8 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
   .top { padding: 10px 12px; gap: 8px 10px; }
   .top .logo { font-size: 15px; }
   .search { flex-basis: 100%; order: 3; }
-  .want-nav { order: 2; height: 32px; padding: 0 10px; }
+  .lists-nav { order: 2; }
+  .lists-nav a { height: 28px; padding: 0 9px; }
   .types { width: 100%; }
   .types label { flex: 1; text-align: center; }
   .types span { padding: 8px 4px; }
@@ -423,15 +427,15 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 /* ---------- action buttons: one quiet outline style (last, so it wins over layout rules) ----------
    Every action looks like Want: light surface, hairline edge, grey label. Colour is kept
    for meaning only — the YouTube play icon, and green / red feedback after Copy or Share. */
-.act.act-yt, .act.act-listen, .act.act-dig, .act.act-copy, .act.act-want, .act.act-share {
+.act.act-yt, .act.act-listen, .act.act-dig, .act.act-copy, .act.act-want, .act.act-share, .act.act-remove, .act.act-clear {
   color: var(--fg-2); background: var(--surface); border-color: var(--line-strong);
 }
-.act.act-yt:hover, .act.act-listen:hover, .act.act-dig:hover, .act.act-copy:hover, .act.act-want:hover, .act.act-share:hover {
+.act.act-yt:hover, .act.act-listen:hover, .act.act-dig:hover, .act.act-copy:hover, .act.act-want:hover, .act.act-share:hover, .act.act-remove:hover, .act.act-clear:hover {
   color: var(--fg); background: var(--surface-2); border-color: var(--fg-3);
 }
 .act.act-yt svg { color: var(--yt); }
 .act.act-dig.open, .act.act-listen.open { color: var(--fg); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
-.act.act-yt:focus-visible, .act.act-listen:focus-visible, .act.act-dig:focus-visible, .act.act-copy:focus-visible, .act.act-want:focus-visible, .act.act-share:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.act.act-remove:focus-visible, .act.act-clear:focus-visible, .act.act-yt:focus-visible, .act.act-listen:focus-visible, .act.act-dig:focus-visible, .act.act-copy:focus-visible, .act.act-want:focus-visible, .act.act-share:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* copy / share feedback: tinted outline, no solid fill */
 .act.act-copy.done, .act.act-share.done { color: var(--ok); border-color: var(--ok); background: var(--accent-soft); }
 .act.act-copy.fail, .act.act-share.fail { color: var(--err); border-color: var(--err); background: color-mix(in srgb, var(--err) 10%, var(--surface)); }
