@@ -725,7 +725,14 @@ function rowActions(row: Row): HTMLElement[] {
   return [youtubeButton(row), menuButton('listen', row), menuButton('dig', row), copyButton(copyText(row.artists, row.title)), wantButton(row)];
 }
 
-type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean; /** The row's buttons, when not the usual set (e.g. the Dig history). */ actions?: (row: Row) => HTMLElement[] };
+type TableOpts = {
+  hideRiddim?: boolean;
+  hideLabel?: boolean;
+  /** The row's buttons, when not the usual set (e.g. the Dig history). */
+  actions?: (row: Row) => HTMLElement[];
+  /** false: plain column titles, no sorting (the Dig history keeps its newest-first order). */
+  sortable?: boolean;
+};
 
 function tuneRow(row: Row, opts: TableOpts = {}): HTMLTableRowElement {
   const dash = () => h('span', { class: 'muted' }, '—');
@@ -830,6 +837,7 @@ function tuneTable(
   };
 
   const sortHead = (key: SortKey) => {
+    if (opts.sortable === false) return h('th', { scope: 'col', class: `c-${key}` }, SORT_NAMES[key]);
     const btn = h('button', { type: 'button', class: 'sort-btn' }, SORT_NAMES[key],
       // ▲ over ▼ on every column; the active direction is coloured via th[aria-sort].
       h('span', { class: 'sort-ind', 'aria-hidden': 'true' }, h('span', { class: 'up' }, '▲'), h('span', { class: 'down' }, '▼')));
@@ -846,7 +854,7 @@ function tuneTable(
   const plainHead = (cls: string, text: string) => h('th', { scope: 'col', class: cls }, h('span', { class: 'sr-only' }, text));
 
   const el = h('div', { class: 'tunes-wrap' },
-    h('table', { class: 'tunes' },
+    h('table', { class: opts.sortable === false ? 'tunes no-sort' : 'tunes' },
       h('thead', {},
         h('tr', {},
           sortHead('artist'),
@@ -1510,6 +1518,7 @@ function renderDig() {
   const table = digs.length ? tuneTable(digs.map(snapshotRow), {
     // YouTube, search again, keep it as a Want, or drop it from the history.
     actions: (row) => [youtubeButton(row), menuButton('dig', row), wantButton(row), removeButton(row)],
+    sortable: false, // always last searched first
   }) : null;
   let body: HTMLElement = table ? table.el : empty();
   main.replaceChildren(head, count, body);

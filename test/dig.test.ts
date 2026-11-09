@@ -6,25 +6,25 @@ const ids = (country: string | null) => digProvidersFor(country).map((p) => p.id
 const q = searchText([{ id: 263, name: 'Wayne Smith', url: null }], 'Under Mi Sleng Teng');
 
 describe('digProvidersFor (by country)', () => {
-  it('JP: Discogs, eBay, Mercari, Yahoo! Auctions, Record City', () => {
-    expect(ids('JP')).toEqual(['discogs', 'ebay', 'mercari', 'yahoo-auctions', 'recordcity']);
+  it('JP: Discogs, eBay, Mercari, Yahoo! Auctions, Record City, Google', () => {
+    expect(ids('JP')).toEqual(['discogs', 'ebay', 'mercari', 'yahoo-auctions', 'recordcity', 'google']);
   });
-  it('US, GB: Discogs, eBay', () => {
-    expect(ids('US')).toEqual(['discogs', 'ebay']);
-    expect(ids('GB')).toEqual(['discogs', 'ebay']);
+  it('US, GB: Discogs, eBay, Google', () => {
+    expect(ids('US')).toEqual(['discogs', 'ebay', 'google']);
+    expect(ids('GB')).toEqual(['discogs', 'ebay', 'google']);
   });
-  it('unknown / invalid country: Discogs, eBay', () => {
-    for (const c of [null, '', 'XX', 'T1', 'JPN', '??']) expect(ids(c)).toEqual(['discogs', 'ebay']);
+  it('unknown / invalid country: Discogs, eBay, Google', () => {
+    for (const c of [null, '', 'XX', 'T1', 'JPN', '??']) expect(ids(c)).toEqual(['discogs', 'ebay', 'google']);
   });
   it('lower-case codes are accepted', () => {
-    expect(ids('jp')).toEqual(['discogs', 'ebay', 'mercari', 'yahoo-auctions', 'recordcity']);
+    expect(ids('jp')).toEqual(['discogs', 'ebay', 'mercari', 'yahoo-auctions', 'recordcity', 'google']);
   });
   it('is pure: takes the provider list as an argument (region groups work)', () => {
     const extra: DigProvider[] = [
       ...DIG_PROVIDERS,
       { id: 'eu-shop', name: 'EU Shop', countries: [...REGIONS.EU], buildSearchUrl: (s) => `https://example.org/?q=${encodeURIComponent(s)}` },
     ];
-    expect(digProvidersFor('DE', extra).map((p) => p.id)).toEqual(['discogs', 'ebay', 'eu-shop']);
+    expect(digProvidersFor('DE', extra).map((p) => p.id)).toEqual(['discogs', 'ebay', 'google', 'eu-shop']);
     expect(digProvidersFor('JP', extra).map((p) => p.id)).not.toContain('eu-shop');
   });
 });
@@ -38,6 +38,7 @@ describe('dig search URLs', () => {
       mercari: 'https://jp.mercari.com/search?keyword=Wayne%20Smith%20Under%20Mi%20Sleng%20Teng',
       'yahoo-auctions': 'https://auctions.yahoo.co.jp/search/search?p=Wayne%20Smith%20Under%20Mi%20Sleng%20Teng',
       recordcity: 'https://www.recordcity.jp/ja/catalog?keyword=Wayne%20Smith%20Under%20Mi%20Sleng%20Teng',
+      google: 'https://www.google.com/search?q=Wayne%20Smith%20Under%20Mi%20Sleng%20Teng',
     });
     expect(DIG_PROVIDERS[0].buildSearchUrl('Bounty Killer & Wayne Smith #1 / ?')).toBe('https://www.discogs.com/search/?q=Bounty%20Killer%20%26%20Wayne%20Smith%20%231%20%2F%20%3F');
   });

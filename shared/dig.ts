@@ -60,6 +60,13 @@ export const DIG_PROVIDERS: readonly DigProvider[] = [
     // Catalogue search; the site's own form also sends a session _token, which a plain GET does not need.
     buildSearchUrl: (q) => `https://www.recordcity.jp/ja/catalog?keyword=${encodeURIComponent(q)}`,
   },
+  {
+    // A plain web search, last: finds the shops and pressings the list above misses.
+    id: 'google',
+    name: 'Google',
+    countries: ['*'],
+    buildSearchUrl: (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+  },
 ];
 
 /** "jp" → "JP"; anything that is not a real two-letter code (XX, T1, "", null) → null. */

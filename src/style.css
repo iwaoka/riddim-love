@@ -384,6 +384,8 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
   .controls { padding: 10px 14px; }
   .count { margin-top: 14px; }
 
+  /* a list without sorting (Dig history) needs no header row on phones */
+  .tunes.no-sort thead { display: none !important; }
   /* header row becomes a strip of sort buttons */
   .tunes thead { display: block; background: var(--head); border-bottom: 1px solid var(--line-strong); }
   /* one row of compact sort chips; on very narrow screens it scrolls sideways instead of wrapping */
