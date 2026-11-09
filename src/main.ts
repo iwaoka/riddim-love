@@ -538,7 +538,7 @@ function ensureDigMenu(): HTMLDivElement {
 // "Artist Title" to the clipboard, ready to paste into the app's search box.
 let toastEl: HTMLElement | null = null;
 let toastTimer = 0;
-function toast(msg: string) {
+function toast(msg: string, ms = 4000) {
   if (!toastEl) {
     toastEl = h('div', { class: 'toast', 'aria-hidden': 'true' }); // the live region (announce) speaks it
     document.body.appendChild(toastEl);
@@ -546,20 +546,44 @@ function toast(msg: string) {
   toastEl.textContent = msg;
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => toastEl?.classList.remove('show'), 4000);
+  toastTimer = window.setTimeout(() => toastEl?.classList.remove('show'), ms);
 }
 
 /** Click handler for a Listen / Dig search link: on touch screens, copy the query too. */
 function keepQuery(query: string): EventListener {
   return () => {
     if (!matchMedia('(pointer: coarse)').matches) return; // desktop: the web page keeps the search
-    void copyToClipboard(query).then((ok) => {
-      if (!ok) return;
-      const msg = `Copied “${query}” — if the app opens without it, paste it into its search.`;
-      toast(msg);
-      announce(msg);
-    });
+    // Everything happens synchronously inside the tap: once the app opens, the
+    // page is in the background and phones refuse clipboard writes from it
+    // (an awaited navigator.clipboard call would come too late).
+    const ok = copyNow(query);
+    navigator.clipboard?.writeText(query).catch(() => {}); // second try where the API is allowed
+    const msg = ok
+      ? `Copied “${query}” — if the app opens without it, paste it into its search.`
+      : `If the app opens without the search, type “${query}” into it.`;
+    toast(msg, 8000);
+    announce(msg);
   };
+}
+
+/** Synchronous copy (iOS-safe): a hidden, selectable textarea + execCommand. */
+function copyNow(text: string): boolean {
+  const ta = h('textarea', { 'aria-hidden': 'true', class: 'clip', readonly: true });
+  ta.value = text;
+  ta.style.fontSize = '16px'; // no zoom on iOS while focused
+  document.body.appendChild(ta);
+  const active = document.activeElement as HTMLElement | null;
+  ta.focus({ preventScroll: true });
+  ta.setSelectionRange(0, text.length); // iOS ignores select() on read-only fields
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch {
+    ok = false;
+  }
+  ta.remove();
+  active?.focus({ preventScroll: true });
+  return ok;
 }
 
 /** The two menus that share the popover: record shops (Dig) and streaming services (Listen). */
