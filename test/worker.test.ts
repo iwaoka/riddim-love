@@ -42,6 +42,12 @@ describe('project (real response shapes, 2026-11-06)', () => {
       label: { id: 61, name: "Jammy's", url: 'https://riddim-id.com/labels/61/jammys' },
     });
   });
+  it('riddim keeps its original tune(s), empty when upstream has none', () => {
+    const base = { id: 18, name: 'Sleng Teng', slug: 'sleng-teng', url: 'https://riddim-id.com/riddims/18/sleng-teng', counts: { tunes: 313, tunes_including_versions: 619, versions: 26 } };
+    expect(P.riddim({ ...base, original_tunes: [rawTune] })?.original_tunes).toEqual([P.tune(rawTune)]);
+    expect(P.riddim({ ...base, original_tunes: [{ title: 'no id' }] })?.original_tunes).toEqual([]);
+    expect(P.riddim(base)?.original_tunes).toEqual([]);
+  });
   it('tolerates missing/odd fields and drops non riddim-id urls', () => {
     const t = P.tune({ id: 1, title: 'X', artists: [{ id: 2, name: 'A', url: 'javascript:alert(1)' }], riddim: null, label: null });
     expect(t?.artists[0].url).toBeNull();

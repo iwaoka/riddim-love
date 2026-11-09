@@ -1,7 +1,7 @@
 import './style.css';
 import { digProvidersFor, normalizeCountry } from '../shared/dig';
 import { artistNames, copyText, displayText, externalSearchUrl, searchText } from '../shared/format';
-import { labelMeta, ORIGIN, parsePagePath, personMeta, refPath, riddimMeta, tuneMeta, tunePath, type PageMeta } from '../shared/seo';
+import { altNames, labelMeta, ORIGIN, ORIGINAL_TUNES_MAX, originalTuneText, parsePagePath, personMeta, refPath, riddimMeta, tuneMeta, tunePath, type PageMeta } from '../shared/seo';
 import { filterWords, matches } from '../shared/filter';
 import { sameName, splitArtistTitle, splitByArtistPrefix, splitByArtistSuffix, swapArtistTitle, type ArtistTitle } from '../shared/pair';
 import { formatSort, parseSort, sortRows, type SortDir, type SortKey } from '../shared/sort';
@@ -1082,7 +1082,18 @@ async function renderList(route: Extract<Route, { view: 'list' }>, signal: Abort
     // No year / producer here: a riddim list also holds later re-licks under the
     // same name (other years, other producers), so the original's facts mislead.
     if (riddim.version_of) head.appendChild(h('p', { class: 'facts' }, 'Version of ', link(listHref('riddim', riddim.version_of), riddim.version_of.name)));
-    if (riddim.alternate_names.length) head.appendChild(h('p', { class: 'facts muted' }, 'Also known as ' + riddim.alternate_names.join(', ')));
+    // Original tune(s): the year shown is the tune's, never the riddim's.
+    const originals = (riddim.original_tunes ?? []).slice(0, ORIGINAL_TUNES_MAX);
+    if (originals.length) {
+      const parts: (Node | string)[] = [`Original tune${originals.length > 1 ? 's' : ''}: `];
+      originals.forEach((t, i) => {
+        if (i) parts.push('; ');
+        parts.push(link(tunePath(t), originalTuneText(t)));
+      });
+      head.appendChild(h('p', { class: 'facts orig-tune' }, ...parts));
+    }
+    const alts = altNames(riddim.name, riddim.alternate_names);
+    if (alts.shown.length) head.appendChild(h('p', { class: 'facts muted' }, 'Also known as ' + alts.shown.join(', ') + (alts.more ? ` +${alts.more} more` : '')));
     if (riddim.versions.length) {
       head.appendChild(
         h('details', { class: 'versions', open: true },

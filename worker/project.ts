@@ -130,5 +130,7 @@ export function riddim(v: unknown): Riddim | null {
       tunes_including_versions: int(counts.tunes_including_versions),
       versions: int(counts.versions),
     },
+    // Only on the single-riddim endpoint; same shape as any tune.
+    original_tunes: tunes(v.original_tunes),
   };
 }

@@ -2,6 +2,7 @@
 // Shared by the Worker (server-rendered HTML) and the browser app, so links,
 // canonical URLs and <title>s are identical whichever side builds them.
 
+import { fold } from './filter';
 import { artistNames, displayText } from './format';
 import type { Ref, Tune } from './types';
 
@@ -128,4 +129,31 @@ export function tuneMeta(t: Tune): PageMeta {
     description: clip(`${at}${t.year ? ` (${t.year})` : ''}${bits.length ? `, ${bits.join(', ')}` : ''}.`),
     h1: at,
   };
+}
+
+// ---------- riddim page head (shared by the Worker and the app) ----------
+
+/** "Wayne Smith – Under Mi Sleng Teng (1985)": the year belongs to the tune, not the riddim. */
+export function originalTuneText(t: Pick<Tune, 'artists' | 'title' | 'year'>): string {
+  return displayText(t.artists, t.title) + (t.year ? ` (${t.year})` : '');
+}
+
+export const ORIGINAL_TUNES_MAX = 3;
+export const ALT_NAMES_MAX = 5;
+
+/**
+ * Alternate names worth showing: not the riddim's own name again (ignoring
+ * case, accents, apostrophes and the word "Riddim"), no repeats, at most `max`.
+ */
+export function altNames(name: string, alts: readonly string[], max = ALT_NAMES_MAX): { shown: string[]; more: number } {
+  const key = (s: string) => fold(s).replace(/\briddim\b/g, '').replace(/\s+/g, ' ').trim();
+  const seen = new Set([key(name)]);
+  const kept: string[] = [];
+  for (const a of alts) {
+    const k = key(a);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    kept.push(a.trim());
+  }
+  return { shown: kept.slice(0, max), more: Math.max(0, kept.length - max) };
 }

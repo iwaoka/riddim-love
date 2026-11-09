@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pagePath, parsePagePath, refPath, riddimMeta, riddimName, slugFromUrl, slugify, tuneMeta, tunePath } from '../shared/seo';
+import { altNames, originalTuneText, pagePath, parsePagePath, refPath, riddimMeta, riddimName, slugFromUrl, slugify, tuneMeta, tunePath } from '../shared/seo';
 import type { Tune } from '../shared/types';
 
 const tune: Tune = {
@@ -55,5 +55,21 @@ describe('page meta', () => {
   it('tune title', () => {
     expect(tuneMeta(tune).title).toBe('Wayne Smith – Under Mi Sleng Teng (Sleng Teng Riddim, 1985) | RIDDIM.LOVE');
     expect(tuneMeta(tune).description).toBe("Wayne Smith – Under Mi Sleng Teng (1985), on the Sleng Teng Riddim, released on Jammy's, produced by Prince Jammy.");
+  });
+});
+
+describe('riddim head', () => {
+  it('original tune: the year is the tune’s, shown only when known', () => {
+    const artists = [{ id: 263, name: 'Wayne Smith', url: null }];
+    expect(originalTuneText({ artists, title: 'Under Mi Sleng Teng', year: 1985 })).toBe('Wayne Smith – Under Mi Sleng Teng (1985)');
+    expect(originalTuneText({ artists, title: 'X', year: null })).toBe('Wayne Smith – X');
+    expect(originalTuneText({ artists: [], title: 'Dub', year: null })).toBe('Dub');
+  });
+
+  it('alternate names: no repeat of the riddim name, no duplicates, capped', () => {
+    expect(altNames('Sleng Teng', ['Sleng Teng Riddim', 'sleng teng', 'Under Mi Sleng Teng'])).toEqual({ shown: ['Under Mi Sleng Teng'], more: 0 });
+    expect(altNames('Heavenless', ['Live Blanket', 'live blanket', 'Lìve Blanket'])).toEqual({ shown: ['Live Blanket'], more: 0 });
+    expect(altNames('A', ['B', 'C', 'D', 'E', 'F', 'G', 'H'])).toEqual({ shown: ['B', 'C', 'D', 'E', 'F'], more: 2 });
+    expect(altNames('A', [' ', 'Riddim'])).toEqual({ shown: [], more: 0 });
   });
 });

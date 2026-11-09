@@ -84,6 +84,8 @@ export interface Riddim {
   versions: (Ref & { year: number | null })[];
   producers: Ref[];
   counts: { tunes: number | null; tunes_including_versions: number | null; versions: number | null };
+  /** The recording(s) the riddim is named after (upstream `original_tunes`); empty when not known, and on versions. */
+  original_tunes: Tune[];
 }
 
 /** Artist / producer / label record (for page headers). */

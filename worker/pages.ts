@@ -6,8 +6,11 @@
 
 import { displayText } from '../shared/format';
 import {
+  altNames,
   INDEXABLE,
   labelMeta,
+  ORIGINAL_TUNES_MAX,
+  originalTuneText,
   ORIGIN,
   pagePath,
   personMeta,
@@ -114,7 +117,17 @@ async function buildRiddim(id: number, ctx: ExecutionContext, stats: UpstreamSta
   const facts: string[] = [];
   // No year / producer in the head: the list also holds same-name re-licks.
   if (r.version_of) facts.push(`<p class="facts">Version of ${a(refPath('riddim', r.version_of), r.version_of.name)}</p>`);
-  if (r.alternate_names.length) facts.push(`<p class="facts muted">Also known as ${esc(r.alternate_names.join(', '))}</p>`);
+  // Original tune(s): the year shown is the tune's, never the riddim's.
+  const originals = r.original_tunes.slice(0, ORIGINAL_TUNES_MAX);
+  if (originals.length) {
+    facts.push(
+      `<p class="facts orig-tune">Original tune${originals.length > 1 ? 's' : ''}: ` +
+        originals.map((t) => a(pagePath('tune', t.id, slugify(t.title)), originalTuneText(t))).join('; ') +
+        `</p>`,
+    );
+  }
+  const alts = altNames(r.name, r.alternate_names);
+  if (alts.shown.length) facts.push(`<p class="facts muted">Also known as ${esc(alts.shown.join(', '))}${alts.more ? ` +${alts.more} more` : ''}</p>`);
   if (r.versions.length) {
     facts.push(
       `<details class="versions" open><summary>${r.versions.length} version${r.versions.length === 1 ? '' : 's'}</summary><ul class="chips">` +
