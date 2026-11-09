@@ -146,6 +146,8 @@ body.home .search-box { flex: none; }
 body.home .search input[type="search"] { font-size: 18px; padding: 12px 16px; }
 body.home .search button { padding: 0 22px; }
 body.home .hint { display: block; text-align: center; }
+/* Enter and / are keyboard tips: not on touch screens (phones, tablets) */
+@media (pointer: coarse) { body.home .hint { display: none; } }
 body.home .credit { display: block; margin: -4px 0 0; text-align: center; font-size: 12px; }
 .tagline { display: none; margin: -10px 0 4px; color: var(--fg-2); }
 body.home .tagline { display: block; }
