@@ -679,6 +679,8 @@ function menuLinksOpen(kind: MenuKind, row: Row): HTMLElement {
     h('p', { class: 'dig-open-head' }, icon(m.icon, 15), ' ' + m.name),
     appNote(),
     h('p', { class: 'acts acts-lg' },
+      // On the tune page YouTube leads the Listen services (rows keep it as its own button).
+      kind === 'listen' ? youtubeButton(row) : null,
       ...menuLinks(kind, query).map((l) =>
         h('a', {
           class: `act act-${kind}`,
@@ -1398,7 +1400,8 @@ async function renderTune(id: number, signal: AbortSignal) {
       h('h1', { class: 'at' }, text),
       h('dl', {}, ...rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, ...v)])),
       // Dig is laid out open here (no menu to open): one click to a shop.
-      h('p', { class: 'acts acts-lg' }, youtubeButton(t), copyButton(copyText(t.artists, t.title), true), wantButton(t, true), shareButton(text, ORIGIN + tunePath(t))),
+      // Copy → Share → Want (right-aligned on phones); YouTube sits in Listen below.
+      h('p', { class: 'acts acts-lg tune-acts' }, copyButton(copyText(t.artists, t.title), true), shareButton(text, ORIGIN + tunePath(t)), wantButton(t, true)),
       // Listen and Dig are laid out open here (no menu to open): one click to a service.
       menuLinksOpen('listen', t),
       menuLinksOpen('dig', t),

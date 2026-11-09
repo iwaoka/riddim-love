@@ -541,3 +541,5 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 .dig-open { margin: 0 0 12px; }
 .dig-open-head { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--fg-2); }
 .dig-open .acts-lg { margin: 0; }
+/* tune page: Copy / Share / Want sit at the right on phones */
+@media (max-width: 720px) { .tune-acts { justify-content: flex-end; } }
