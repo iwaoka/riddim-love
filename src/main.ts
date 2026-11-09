@@ -1,5 +1,6 @@
 import './style.css';
 import { digProvidersFor, normalizeCountry } from '../shared/dig';
+import { LISTEN_PROVIDERS } from '../shared/listen';
 import { artistNames, copyText, displayText, externalSearchUrl, searchText } from '../shared/format';
 import { altNames, labelMeta, ORIGIN, ORIGINAL_TUNES_MAX, originalTuneText, parsePagePath, personMeta, refPath, riddimMeta, tuneMeta, tunePath, type PageMeta } from '../shared/seo';
 import { filterWords, matches } from '../shared/filter';
@@ -337,24 +338,6 @@ function youtubeButton(row: Pick<Row, 'artists' | 'title'>): HTMLAnchorElement {
 }
 
 /**
- * Apple Music search for "Artist Title" in the visitor's own store (new tab;
- * opens the Music app where installed). Icon only in tune rows, so the
- * Riddim / Label columns keep their width; labelled on the tune page.
- */
-function appleMusicButton(row: Pick<Row, 'artists' | 'title'>, withText = false): HTMLAnchorElement {
-  const query = searchText(row.artists, row.title);
-  const label = `Search Apple Music for “${query}” (opens in a new tab)`;
-  return h('a', {
-    href: externalSearchUrl('applemusic', row.artists, row.title, visitorCountry),
-    target: '_blank',
-    rel: 'noopener noreferrer',
-    class: 'act act-am',
-    title: label,
-    'aria-label': label,
-  }, h('span', { class: 'act-ico' }, icon('music', 16)), withText ? h('span', { class: 'act-text' }, 'Apple Music') : null);
-}
-
-/**
  * Share this page: the system share sheet where there is one (phones), else
  * copy the link. Nothing is sent anywhere by the site itself.
  */
@@ -548,20 +531,35 @@ function ensureDigMenu(): HTMLDivElement {
   return menu;
 }
 
-function openDig(btn: HTMLButtonElement, row: Pick<Row, 'artists' | 'title'>, focusFirst: boolean) {
+/** The two menus that share the popover: record shops (Dig) and streaming services (Listen). */
+type MenuKind = 'dig' | 'listen';
+const MENU = {
+  dig: { name: 'Dig', icon: 'disc', what: 'search record shops', label: 'Dig for records' },
+  listen: { name: 'Listen', icon: 'music', what: 'search streaming services', label: 'Listen' },
+} as const;
+
+/** Search links for a menu, in config order: Dig shops for this country, or the Listen services. */
+function menuLinks(kind: MenuKind, query: string): { name: string; url: string }[] {
+  return kind === 'dig'
+    ? digProviders.map((s) => ({ name: s.name, url: s.buildSearchUrl(query) }))
+    : LISTEN_PROVIDERS.map((s) => ({ name: s.name, url: s.buildSearchUrl(query, visitorCountry) }));
+}
+
+function openDig(btn: HTMLButtonElement, row: Pick<Row, 'artists' | 'title'>, focusFirst: boolean, kind: MenuKind = 'dig') {
   closeDig(false);
   const menu = ensureDigMenu();
   const query = searchText(row.artists, row.title);
+  menu.setAttribute('aria-label', MENU[kind].label);
   menu.replaceChildren(
     h('p', { class: 'dig-head', 'aria-hidden': 'true' }, query),
-    ...digProviders.map((s) =>
+    ...menuLinks(kind, query).map((l) =>
       h('a', {
         role: 'menuitem',
-        href: s.buildSearchUrl(query),
+        href: l.url,
         target: '_blank',
         rel: 'noopener noreferrer',
-        title: `Search ${s.name} for “${query}” (opens in a new tab)`,
-      }, h('span', { class: 'dig-name' }, s.name), h('span', { class: 'dig-host', 'aria-hidden': 'true' }, new URL(s.buildSearchUrl('')).hostname.replace(/^www\./, ''))),
+        title: `Search ${l.name} for “${query}” (opens in a new tab)`,
+      }, h('span', { class: 'dig-name' }, l.name), h('span', { class: 'dig-host', 'aria-hidden': 'true' }, new URL(l.url).hostname.replace(/^(www|open)\./, ''))),
     ),
   );
   menu.hidden = false;
@@ -572,53 +570,56 @@ function openDig(btn: HTMLButtonElement, row: Pick<Row, 'artists' | 'title'>, fo
   if (focusFirst) menu.querySelector<HTMLAnchorElement>('[role="menuitem"]')?.focus();
 }
 
-/** The Dig shops as plain links (tune page): same providers and query as the menu. */
-function digLinks(row: Pick<Row, 'artists' | 'title'>): HTMLElement {
+/** A menu's links laid out open (tune page): same services and query as the row menu. */
+function menuLinksOpen(kind: MenuKind, row: Pick<Row, 'artists' | 'title'>): HTMLElement {
+  const m = MENU[kind];
   const query = searchText(row.artists, row.title);
-  return h('div', { class: 'dig-open', role: 'group', 'aria-label': `Dig: search record shops for “${query}”` },
-    h('p', { class: 'dig-open-head' }, icon('disc', 15), ' Dig'),
+  return h('div', { class: 'dig-open', role: 'group', 'aria-label': `${m.name}: ${m.what} for “${query}”` },
+    h('p', { class: 'dig-open-head' }, icon(m.icon, 15), ' ' + m.name),
     h('p', { class: 'acts acts-lg' },
-      ...digProviders.map((s) =>
+      ...menuLinks(kind, query).map((l) =>
         h('a', {
-          class: 'act act-dig',
-          href: s.buildSearchUrl(query),
+          class: `act act-${kind}`,
+          href: l.url,
           target: '_blank',
           rel: 'noopener noreferrer',
-          title: `Search ${s.name} for “${query}” (opens in a new tab)`,
-        }, h('span', { class: 'act-text' }, s.name)),
+          title: `Search ${l.name} for “${query}” (opens in a new tab)`,
+        }, h('span', { class: 'act-text' }, l.name)),
       ),
     ),
   );
 }
 
-function digButton(row: Pick<Row, 'artists' | 'title'>): HTMLButtonElement {
+/** Row button that opens the Dig or Listen menu. */
+function menuButton(kind: MenuKind, row: Pick<Row, 'artists' | 'title'>): HTMLButtonElement {
+  const m = MENU[kind];
   const query = searchText(row.artists, row.title);
-  const label = `Dig: search record shops for “${query}”`;
+  const label = `${m.name}: ${m.what} for “${query}”`;
   const btn = h('button', {
     type: 'button',
-    class: 'act act-dig',
+    class: `act act-${kind}`,
     title: label,
     'aria-label': label,
     'aria-haspopup': 'menu',
     'aria-expanded': 'false',
     'aria-controls': 'dig-menu',
-  }, icon('disc', 16), actLabel('Dig'));
+  }, icon(m.icon, 16), actLabel(m.name));
   btn.addEventListener('click', (e) => {
     if (digOwner === btn) closeDig(false);
-    else openDig(btn, row, e.detail === 0); // detail 0 = keyboard (Enter/Space): move focus into the menu
+    else openDig(btn, row, e.detail === 0, kind); // detail 0 = keyboard (Enter/Space): move focus into the menu
   });
   btn.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      openDig(btn, row, true);
+      openDig(btn, row, true, kind);
     }
   });
   return btn;
 }
 
-/** YouTube → Apple Music → Copy → Dig → Want. Tune details are reached by clicking the title. */
+/** YouTube → Listen → Copy → Dig → Want. Tune details are reached by clicking the title. */
 function rowActions(row: Row): HTMLElement[] {
-  return [youtubeButton(row), appleMusicButton(row), copyButton(copyText(row.artists, row.title)), digButton(row), wantButton(row)];
+  return [youtubeButton(row), menuButton('listen', row), copyButton(copyText(row.artists, row.title)), menuButton('dig', row), wantButton(row)];
 }
 
 type TableOpts = { hideRiddim?: boolean; hideLabel?: boolean };
@@ -1292,8 +1293,10 @@ async function renderTune(id: number, signal: AbortSignal) {
       h('h1', { class: 'at' }, text),
       h('dl', {}, ...rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, ...v)])),
       // Dig is laid out open here (no menu to open): one click to a shop.
-      h('p', { class: 'acts acts-lg' }, youtubeButton(t), appleMusicButton(t, true), copyButton(copyText(t.artists, t.title)), wantButton(t, true), shareButton(text, ORIGIN + tunePath(t))),
-      digLinks(t),
+      h('p', { class: 'acts acts-lg' }, youtubeButton(t), copyButton(copyText(t.artists, t.title)), wantButton(t, true), shareButton(text, ORIGIN + tunePath(t))),
+      // Listen and Dig are laid out open here (no menu to open): one click to a service.
+      menuLinksOpen('listen', t),
+      menuLinksOpen('dig', t),
     ),
   );
 }

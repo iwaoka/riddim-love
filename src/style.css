@@ -23,7 +23,6 @@
   --shadow: 0 1px 2px rgb(16 24 32 / 0.04), 0 1px 1px rgb(16 24 32 / 0.03);
   --yt: #cc1f1a;
   --yt-hover: #a91913;
-  --am: #e0243e;
   --radius: 8px;
   --radius-sm: 6px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
@@ -52,7 +51,6 @@
     --shadow: none;
     --yt: #c42b1c;
     --yt-hover: #dc3b2b;
-    --am: #ff4d63;
   }
 }
 
@@ -426,16 +424,15 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 /* ---------- action buttons: one quiet outline style (last, so it wins over layout rules) ----------
    Every action looks like Want: light surface, hairline edge, grey label. Colour is kept
    for meaning only — the YouTube play icon, and green / red feedback after Copy or Share. */
-.act.act-yt, .act.act-am, .act.act-dig, .act.act-copy, .act.act-want, .act.act-share {
+.act.act-yt, .act.act-listen, .act.act-dig, .act.act-copy, .act.act-want, .act.act-share {
   color: var(--fg-2); background: var(--surface); border-color: var(--line-strong);
 }
-.act.act-yt:hover, .act.act-am:hover, .act.act-dig:hover, .act.act-copy:hover, .act.act-want:hover, .act.act-share:hover {
+.act.act-yt:hover, .act.act-listen:hover, .act.act-dig:hover, .act.act-copy:hover, .act.act-want:hover, .act.act-share:hover {
   color: var(--fg); background: var(--surface-2); border-color: var(--fg-3);
 }
 .act.act-yt svg { color: var(--yt); }
-.act.act-am svg { color: var(--am); } /* Apple Music: only the note icon is coloured */
-.act.act-dig.open { color: var(--fg); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
-.act.act-yt:focus-visible, .act.act-am:focus-visible, .act.act-dig:focus-visible, .act.act-copy:focus-visible, .act.act-want:focus-visible, .act.act-share:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.act.act-dig.open, .act.act-listen.open { color: var(--fg); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.act.act-yt:focus-visible, .act.act-listen:focus-visible, .act.act-dig:focus-visible, .act.act-copy:focus-visible, .act.act-want:focus-visible, .act.act-share:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* copy / share feedback: tinted outline, no solid fill */
 .act.act-copy.done, .act.act-share.done { color: var(--ok); border-color: var(--ok); background: var(--accent-soft); }
 .act.act-copy.fail, .act.act-share.fail { color: var(--err); border-color: var(--err); background: color-mix(in srgb, var(--err) 10%, var(--surface)); }
