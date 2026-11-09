@@ -86,7 +86,7 @@ async function handleApi(url: URL, ctx: ExecutionContext): Promise<Response> {
     const hits = Array.isArray(data(body)) ? (data(body) as unknown[]) : [];
     const result: SuggestResult = {
       query: q,
-      names: hits.map(P.nameHit).filter((x): x is NameHit => x !== null && x.type !== 'producer'),
+      names: hits.map(P.nameHit).filter((x): x is NameHit => x !== null),
       tunes: hits.map(P.tuneHit).filter((x): x is TuneHit => x !== null),
     };
     return json(result);

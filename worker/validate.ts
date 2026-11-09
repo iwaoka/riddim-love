@@ -37,6 +37,6 @@ export function onlyParams(params: URLSearchParams, allowed: readonly string[]):
   }
 }
 
-export const SEARCH_TYPES = ['riddim', 'tune', 'artist', 'label'] as const;
+export const SEARCH_TYPES = ['riddim', 'tune', 'artist', 'label', 'producer'] as const;
 export const RIDDIM_TUNE_SORTS = ['site', 'title', 'artist', 'year', '-year'] as const;
 export const TUNE_SORTS = ['site', 'title', 'year', '-year'] as const;

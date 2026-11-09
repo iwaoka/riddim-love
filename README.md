@@ -10,7 +10,7 @@ Data provided by [Riddim-ID](https://riddim-id.com/) via its public API v1. RIDD
 
 ## Features
 
-- Targeted search: pick **Riddim** (default), **Tune** (titles only), **Artist** or **Label**; one upstream `/search?types=<target>` request, nothing else shown. Typo tolerant
+- Targeted search: pick **Riddim** (default), **Tune** (titles only), **Artist**, **Label** or **Producer**; one upstream `/search?types=<target>` request, nothing else shown. Typo tolerant
 - The chosen target is kept in the URL (`/?type=tune&q=pumpkin+belly`) and remembered for next time
 - Compact tune table: Artist, Title, Riddim, Label, Year, then row actions: **YouTube / Copy / Dig / Want**; the whole row opens the tune page (artist / riddim / label are plain text in lists, linked on the tune page)
 - YouTube: search results for `Artist Title` (new tab). Copy: `Artist - Title` to the clipboard. Tune search (beta): paste `Artist - Title` or `Title - Artist` (also `–`, `—`, or tab-separated) and it opens that artist’s page filtered by the title — the whole list, so no 50-hit cap (`shared/pair.ts`). If several artists share the name, pick one; if none matches, the title alone is searched and hits by matching artists are shown. Without a separator, `Artist Title` or `Title Artist` is tried when no title matches: an artist search on the whole query (longest artist name the query starts with), then on its last word alone (longest name it ends with); the whole query being an artist name opens that artist.

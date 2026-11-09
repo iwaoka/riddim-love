@@ -114,7 +114,7 @@ function parseRoute(loc: { pathname: string; search: string }): Route {
 }
 
 // ---------- search target (Riddim / Tune / Artist / Label) ----------
-const SEARCH_TYPES: SearchType[] = ['riddim', 'tune', 'artist', 'label'];
+const SEARCH_TYPES: SearchType[] = ['riddim', 'tune', 'artist', 'label', 'producer'];
 const TYPE_KEY = 'riddim.love:type';
 const isSearchType = (v: unknown): v is SearchType => SEARCH_TYPES.includes(v as SearchType);
 const typeRadios = [...document.querySelectorAll<HTMLInputElement>('#types input[name="type"]')];
@@ -124,6 +124,7 @@ const TYPE_UI: Record<SearchType, { placeholder: string; label: string; plural: 
   tune: { placeholder: 'Title or Artist - Title', label: 'Search tune titles, or paste Artist - Title', plural: 'tunes' },
   artist: { placeholder: 'Artist name, e.g. Tenor Saw', label: 'Search artist names', plural: 'artists' },
   label: { placeholder: 'Label name, e.g. Jammys', label: 'Search label names', plural: 'labels' },
+  producer: { placeholder: 'Producer name, e.g. King Jammy', label: 'Search producer names', plural: 'producers' },
 };
 
 function storedType(): SearchType {
@@ -787,6 +788,7 @@ const NO_MATCH_TIP: Record<SearchType, string> = {
   tune: 'Tune search looks at titles. “Artist - Title” or “Artist Title” also works (beta), or switch to Artist.',
   artist: 'Try another spelling, or the artist’s best-known name.',
   label: 'Try another spelling, or the label’s short name.',
+  producer: 'Try another spelling, or the name the producer is credited under (e.g. Prince Jammy / King Jammy).',
 };
 
 function countNote(n: number, limit: number, noun: string, extra = ''): string {
@@ -878,7 +880,7 @@ async function renderSearch(q: string, type: SearchType, signal: AbortSignal) {
  * Returns true when it rendered something; false → run the plain title search.
  */
 const SUGGEST_MAX = 6;
-const TYPE_NAME: Record<SearchType, string> = { riddim: 'Riddim', tune: 'Tune', artist: 'Artist', label: 'Label' };
+const TYPE_NAME: Record<SearchType, string> = { riddim: 'Riddim', tune: 'Tune', artist: 'Artist', label: 'Label', producer: 'Producer' };
 
 /**
  * Nothing matched: one search across all four types (one request, only now),

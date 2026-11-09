@@ -60,11 +60,12 @@ describe('project (real response shapes, 2026-11-06)', () => {
 });
 
 describe('search type', () => {
-  it('accepts only the four targets', async () => {
+  it('accepts only the five targets', async () => {
     const { SEARCH_TYPES } = await import('../worker/validate');
-    expect(SEARCH_TYPES).toEqual(['riddim', 'tune', 'artist', 'label']);
+    expect(SEARCH_TYPES).toEqual(['riddim', 'tune', 'artist', 'label', 'producer']);
     expect(parseEnum('tune', SEARCH_TYPES)).toBe('tune');
-    expect(() => parseEnum('producer', SEARCH_TYPES)).toThrow(BadRequest);
+    expect(parseEnum('producer', SEARCH_TYPES)).toBe('producer');
+    expect(() => parseEnum('engineer', SEARCH_TYPES)).toThrow(BadRequest);
     expect(() => parseEnum('riddim,artist', SEARCH_TYPES)).toThrow(BadRequest);
   });
 });
