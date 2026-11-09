@@ -535,19 +535,11 @@ function ensureDigMenu(): HTMLDivElement {
 // ---------- phones: store apps drop the search words ----------
 // On a phone, Spotify / Apple Music / SoundCloud / Discogs… links open their
 // app, which ignores the search in the URL. So a tap there also copies
-// "Artist Title" to the clipboard, ready to paste into the app's search box.
-let toastEl: HTMLElement | null = null;
-let toastTimer = 0;
-function toast(msg: string, ms = 4000) {
-  if (!toastEl) {
-    toastEl = h('div', { class: 'toast', 'aria-hidden': 'true' }); // the live region (announce) speaks it
-    document.body.appendChild(toastEl);
-  }
-  toastEl.textContent = msg;
-  toastEl.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => toastEl?.classList.remove('show'), ms);
-}
+// "Artist Title" to the clipboard, ready to paste into the app's search box,
+// and a red note says so where the services are listed (shown on touch
+// screens only, by CSS) — read before the tap, since the app opens at once.
+const APP_NOTE = 'Opens the app? The search is copied when you tap — paste it into the app’s search.';
+const appNote = () => h('p', { class: 'app-note' }, APP_NOTE);
 
 /** Click handler for a Listen / Dig search link: on touch screens, copy the query too. */
 function keepQuery(query: string): EventListener {
@@ -558,11 +550,7 @@ function keepQuery(query: string): EventListener {
     // (an awaited navigator.clipboard call would come too late).
     const ok = copyNow(query);
     navigator.clipboard?.writeText(query).catch(() => {}); // second try where the API is allowed
-    const msg = ok
-      ? `Copied “${query}” — if the app opens without it, paste it into its search.`
-      : `If the app opens without the search, type “${query}” into it.`;
-    toast(msg, 8000);
-    announce(msg);
+    announce(ok ? `Copied “${query}”` : `Copy failed: type “${query}” into the app`);
   };
 }
 
@@ -607,6 +595,7 @@ function openDig(btn: HTMLButtonElement, row: Pick<Row, 'artists' | 'title'>, fo
   menu.setAttribute('aria-label', MENU[kind].label);
   menu.replaceChildren(
     h('p', { class: 'dig-head', 'aria-hidden': 'true' }, query),
+    appNote(),
     ...menuLinks(kind, query).map((l) =>
       h('a', {
         role: 'menuitem',
@@ -632,6 +621,7 @@ function menuLinksOpen(kind: MenuKind, row: Pick<Row, 'artists' | 'title'>): HTM
   const query = searchText(row.artists, row.title);
   return h('div', { class: 'dig-open', role: 'group', 'aria-label': `${m.name}: ${m.what} for “${query}”` },
     h('p', { class: 'dig-open-head' }, icon(m.icon, 15), ' ' + m.name),
+    appNote(),
     h('p', { class: 'acts acts-lg' },
       ...menuLinks(kind, query).map((l) =>
         h('a', {

@@ -447,16 +447,10 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 .want-star { color: #b07800; }
 .act.act-share { min-width: 118px; } /* fits "Link copied", so width never changes */
 
-/* short notice (phones: search words copied for the app) */
-.toast {
-  position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 30;
-  max-width: min(92vw, 420px); padding: 10px 14px; border-radius: var(--radius);
-  background: var(--fg); color: var(--canvas); font-size: 13.5px; line-height: 1.4; text-align: center;
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
-  transform: translate(-50%, 12px); opacity: 0; pointer-events: none;
-}
-.toast.show { transform: translate(-50%, 0); opacity: 1; }
-@media (prefers-reduced-motion: no-preference) { .toast { transition: opacity 0.18s ease, transform 0.18s ease; } }
+/* phones: store apps drop the search; it is copied on tap (see keepQuery) */
+.app-note { display: none; margin: 0 8px 6px; font-size: 12px; line-height: 1.4; color: var(--err); white-space: normal; }
+.dig-open .app-note { margin: -2px 0 8px; }
+@media (pointer: coarse) { .app-note { display: block; } }
 
 /* ---------- cookie consent (EU/EEA, UK, CH only; see /analytics.js) ---------- */
 .consent {
