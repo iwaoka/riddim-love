@@ -384,13 +384,6 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
   .top { padding: 10px 12px; gap: 8px 10px; }
   .top .logo-text { font-size: 15.5px; }
   .top .logo { gap: 7px; }
-}
-/* very narrow phones: logo and Dig | Want still share one row */
-@media (max-width: 359px) {
-  .top .logo-text { font-size: 13.5px; }
-  .top .logo { gap: 6px; }
-  .top .logo-mark { width: 28px; height: 28px; }
-  .lists-nav a { padding: 0 7px; gap: 4px; font-size: 13px; }
   .search { flex-basis: 100%; order: 3; }
   .lists-nav { order: 2; }
   .lists-nav a { height: 28px; padding: 0 9px; }
@@ -562,3 +555,11 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 .dig-open .acts-lg { margin: 0; }
 /* tune page: Copy / Share / Want sit at the right on phones */
 @media (max-width: 720px) { .tune-acts { justify-content: flex-end; } }
+
+/* very narrow phones (after the small-screen rules, so these win): logo and Dig | Want still share one row */
+@media (max-width: 359px) {
+  .top .logo-text { font-size: 13.5px; }
+  .top .logo { gap: 6px; }
+  .top .logo-mark { width: 28px; height: 28px; }
+  .lists-nav a { padding: 0 7px; gap: 4px; font-size: 13px; }
+}
