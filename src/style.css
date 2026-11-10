@@ -23,6 +23,7 @@
   --shadow: 0 1px 2px rgb(16 24 32 / 0.04), 0 1px 1px rgb(16 24 32 / 0.03);
   --yt: #cc1f1a;
   --yt-hover: #a91913;
+  --heart: #d8283a;
   --radius: 8px;
   --radius-sm: 6px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
@@ -51,6 +52,7 @@
     --shadow: none;
     --yt: #c42b1c;
     --yt-hover: #dc3b2b;
+    --heart: #ff5a6a;
   }
 }
 
@@ -93,16 +95,20 @@ button:hover, select:hover { border-color: var(--fg-3); }
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px;
   padding: 12px max(16px, calc((100% - 1200px) / 2 + 16px));
 }
-/* Header logo on every page: the heart mark + a tight, heavy word mark */
-.logo { display: inline-flex; align-items: center; gap: 9px; flex: none; text-decoration: none; white-space: nowrap; color: var(--fg); }
-.logo-mark { display: block; width: 32px; height: 32px; }
+/* Header logo on every page: all type — a red heart + a tight, heavy word mark */
+.logo { display: inline-flex; align-items: center; gap: 7px; flex: none; min-height: 32px; text-decoration: none; white-space: nowrap; color: var(--fg); }
+.logo-heart { color: var(--heart); font-size: 19px; line-height: 1; }
 .logo-text { font-size: 17px; font-weight: 800; letter-spacing: 0.01em; line-height: 1; }
 .logo .logo-text span, .hero-mark span { color: var(--accent); }
 /* Home: the large word mark above the search (kept for now) */
 .hero-mark { display: none; margin: 0; font-weight: 800; letter-spacing: 0.04em; line-height: 1.05; white-space: nowrap; }
 body.home .hero-mark { display: block; font-size: clamp(28px, 8.4vw, 60px); }
-.logo:hover .logo-mark { transform: scale(1.06); }
-@media (prefers-reduced-motion: no-preference) { .logo-mark { transition: transform 0.15s ease; } }
+.logo:hover .logo-heart { transform: scale(1.12); }
+.logo-heart { display: inline-block; }
+@media (prefers-reduced-motion: no-preference) { .logo-heart { transition: transform 0.15s ease; } }
+
+/* search toggle: phones only, outside home (see the small-screen rules) */
+.search-toggle { display: none; }
 .search { display: flex; flex-wrap: wrap; align-items: center; flex: 1 1 520px; max-width: 840px; gap: 8px 10px; }
 .search-box { display: flex; flex: 1 1 280px; gap: 6px; min-width: 0; }
 
@@ -383,7 +389,16 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 @media (max-width: 720px) {
   .top { padding: 10px 12px; gap: 8px 10px; }
   .top .logo-text { font-size: 15.5px; }
-  .top .logo { gap: 7px; }
+  .top .logo { gap: 6px; }
+  /* outside home the search bar folds away: the magnifier beside Dig | Want opens it */
+  body:not(.home) .search-toggle {
+    order: 2; flex: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; padding: 0; border-radius: 99px; cursor: pointer;
+    color: var(--fg-2); background: var(--surface-2); border: 1px solid var(--line-strong);
+  }
+  body:not(.home) .search-toggle[aria-expanded="true"] { color: var(--fg); background: var(--accent-soft); border-color: var(--accent); }
+  body:not(.home) .search-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  body:not(.home):not(.search-open) .search { display: none; }
   .search { flex-basis: 100%; order: 3; }
   .lists-nav { order: 2; }
   .lists-nav a { height: 28px; padding: 0 9px; }
@@ -559,7 +574,6 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
 /* very narrow phones (after the small-screen rules, so these win): logo and Dig | Want still share one row */
 @media (max-width: 359px) {
   .top .logo-text { font-size: 13.5px; }
-  .top .logo { gap: 6px; }
-  .top .logo-mark { width: 28px; height: 28px; }
+  .top .logo { gap: 5px; }
   .lists-nav a { padding: 0 7px; gap: 4px; font-size: 13px; }
 }

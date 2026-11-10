@@ -1553,6 +1553,7 @@ async function render() {
   navController = ctrl;
   const route = parseRoute(location);
   document.body.classList.toggle('home', route.view === 'home');
+  setSearchOpen(route.view === 'search'); // phones: the bar shows on search results, folds away elsewhere
   for (const [el, view] of [[wantNav, 'want'], [digNav, 'dig']] as const) {
     if (route.view === view) el?.setAttribute('aria-current', 'page');
     else el?.removeAttribute('aria-current');
@@ -1617,6 +1618,7 @@ document.addEventListener('keydown', (e) => {
     t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable;
   if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault();
+    setSearchOpen(true);
     input.focus();
     input.select();
   } else if (e.key === 'Escape' && t === input) {
@@ -1685,6 +1687,18 @@ window.addEventListener('popstate', () => {
   returnedId = typeof history.state?.from === 'number' ? history.state.from : typeof history.state?.mark === 'number' ? history.state.mark : null;
   render();
 });
+// ---------- phones: the search bar folds away outside home ----------
+const searchToggle = document.getElementById('search-toggle') as HTMLButtonElement | null;
+function setSearchOpen(open: boolean) {
+  document.body.classList.toggle('search-open', open);
+  searchToggle?.setAttribute('aria-expanded', String(open));
+}
+searchToggle?.addEventListener('click', () => {
+  const open = !document.body.classList.contains('search-open');
+  setSearchOpen(open);
+  if (open) input.focus();
+});
+
 // ---------- static texts and the footer language switch ----------
 /** Texts that live in index.html (English there, for the server-rendered page). */
 function applyStaticTexts() {
