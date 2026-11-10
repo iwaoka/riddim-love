@@ -101,8 +101,8 @@ button:hover, select:hover { border-color: var(--fg-3); }
 .logo-heart { color: var(--heart); width: 0.84em; height: 0.74em; font-size: 17px; flex: none; }
 .logo-text { font-size: 17px; font-weight: 800; letter-spacing: 0.01em; line-height: 1; }
 .logo .logo-text span, .hero-mark span { color: var(--accent); }
-/* Home: the large word mark above the search (kept for now) */
-.hero-mark { display: none; margin: 0; font-weight: 800; letter-spacing: 0.04em; line-height: 1.05; white-space: nowrap; }
+/* Home: "Just find it." above the search */
+.hero-mark { display: none; margin: 0; font-weight: 800; letter-spacing: -0.015em; line-height: 1.05; white-space: nowrap; }
 body.home .hero-mark { display: block; font-size: clamp(28px, 8.4vw, 60px); }
 .logo:hover .logo-heart { transform: scale(1.12); }
 .logo-heart { display: block; transform-origin: 50% 60%; }
@@ -160,8 +160,6 @@ body.home .hint { display: block; text-align: center; }
 /* Enter and / are keyboard tips: not on touch screens (phones, tablets) */
 @media (pointer: coarse) { body.home .hint { display: none; } }
 body.home .credit { display: block; margin: -4px 0 0; text-align: center; font-size: 12px; }
-.tagline { display: none; margin: -10px 0 4px; color: var(--fg-2); }
-body.home .tagline { display: block; }
 
 /* Dig | Want: the visitor's lists, end of the header row; top-right corner on home */
 .lists-nav {
