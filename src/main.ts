@@ -1018,6 +1018,7 @@ const TYPE_NAME: Record<SearchType, string> = { riddim: 'Riddim', tune: 'Tune', 
 async function renderNoMatch(q: string, type: SearchType, tip: string, signal: AbortSignal) {
   const edit = h('button', { type: 'button', class: 'retry' }, T.editSearch);
   edit.addEventListener('click', () => {
+    setSearchOpen(true); // phones: unfold the bar first
     input.focus();
     input.select();
   });
@@ -1553,7 +1554,7 @@ async function render() {
   navController = ctrl;
   const route = parseRoute(location);
   document.body.classList.toggle('home', route.view === 'home');
-  setSearchOpen(route.view === 'search'); // phones: the bar shows on search results, folds away elsewhere
+  setSearchOpen(false); // phones: the bar starts folded on every page but home (the magnifier opens it)
   for (const [el, view] of [[wantNav, 'want'], [digNav, 'dig']] as const) {
     if (route.view === view) el?.setAttribute('aria-current', 'page');
     else el?.removeAttribute('aria-current');
