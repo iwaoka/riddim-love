@@ -767,6 +767,7 @@ function onRowClick(e: MouseEvent) {
     const id = rowTuneId(act.closest('tr'));
     if (id !== null) {
       returnedId = id;
+      history.replaceState({ ...(history.state ?? {}), mark: id }, '');
       markReturned();
     }
     return;
@@ -1630,8 +1631,12 @@ document.addEventListener('keydown', (e) => {
 // every page. Any scroll, tap or key from the visitor cancels it.
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 let pendingY: number | null = typeof history.state?.y === 'number' ? history.state.y : null;
-/** Tune the visitor came back from: its row is marked like a hovered row, and its title focused. */
-let returnedId: number | null = null;
+/**
+ * Tune the visitor came back from (its page, or YouTube / Listen / Dig opened
+ * from its row): the row gets an accent bar and a "Last opened" tag, and its
+ * title is focused. Kept in history.state, so a reload brings it back.
+ */
+let returnedId: number | null = typeof history.state?.mark === 'number' ? history.state.mark : null;
 function restoreScroll() {
   if (pendingY !== null) window.scrollTo(0, pendingY);
   markReturned();
@@ -1646,7 +1651,9 @@ function markReturned() {
   for (const a of main.querySelectorAll<HTMLAnchorElement>('a.tune-link')) {
     if (rowTuneId(a.closest('tr')) !== returnedId) continue;
     for (const tr of main.querySelectorAll('tr.returned')) tr.classList.remove('returned');
+    for (const tag of main.querySelectorAll('.last-tag')) tag.remove();
     a.closest('tr')?.classList.add('returned');
+    a.after(h('span', { class: 'last-tag' }, T.lastOpened));
     // Focus only if nothing else has it (a repaint after loading drops focus to <body>).
     if (!document.activeElement || document.activeElement === document.body || document.activeElement === main) a.focus({ preventScroll: true });
     return;
@@ -1656,9 +1663,26 @@ for (const ev of ['wheel', 'touchstart', 'keydown', 'mousedown'] as const) {
   window.addEventListener(ev, () => { pendingY = null; }, { passive: true, capture: true });
 }
 window.addEventListener('pagehide', () => history.replaceState({ ...(history.state ?? {}), y: window.scrollY }, ''));
+/** Brings the marked row into view (if it is off screen) with one soft pulse. */
+function showMarkedRow() {
+  const tr = main.querySelector<HTMLElement>('tr.returned');
+  if (!tr) return;
+  const r = tr.getBoundingClientRect();
+  const top = document.getElementById('top')?.getBoundingClientRect().bottom ?? 0; // sticky header
+  if (r.top < top || r.bottom > innerHeight) tr.scrollIntoView({ block: 'center' });
+  pendingY = null; // the row wins over a saved scroll position (no snapping back after loading)
+  tr.classList.remove('flash');
+  void tr.offsetWidth; // restart the animation
+  tr.classList.add('flash');
+  window.setTimeout(() => tr.classList.remove('flash'), 1600);
+}
+// Back on this tab (from YouTube, an app, another tab): show the row.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') showMarkedRow();
+});
 window.addEventListener('popstate', () => {
   pendingY = typeof history.state?.y === 'number' ? history.state.y : 0;
-  returnedId = typeof history.state?.from === 'number' ? history.state.from : null;
+  returnedId = typeof history.state?.from === 'number' ? history.state.from : typeof history.state?.mark === 'number' ? history.state.mark : null;
   render();
 });
 // ---------- static texts and the footer language switch ----------
@@ -1696,4 +1720,8 @@ document.querySelector('.foot-inner')?.appendChild(
 );
 applyStaticTexts();
 showType(storedType());
-render();
+// A reload (e.g. the phone dropped the page while an app was open) keeps the mark: show that row.
+const reloadedWithMark = returnedId !== null;
+void render().then(() => {
+  if (reloadedWithMark) showMarkedRow();
+});

@@ -255,8 +255,15 @@ p.state[role="status"] { flex-direction: row; align-items: center; gap: 8px; }
 .tunes tbody tr:nth-child(even), .names-table tbody tr:nth-child(even) { background: var(--stripe); }
 .tunes tbody tr:hover, .names-table tbody tr:hover { background: var(--row-hover); }
 /* the tune just come back from (Back from its page): same look as hover; the row itself shows focus */
-.tunes tbody tr.returned { background: var(--row-hover); }
-.tunes tbody tr.returned .tune-link { color: var(--accent); }
+.tunes tbody tr.returned { background: var(--accent-soft); box-shadow: inset 4px 0 0 var(--accent); }
+.tunes tbody tr.returned:hover { background: var(--accent-soft); }
+.tunes tbody tr.returned .tune-link { color: var(--accent); font-weight: 600; }
+.last-tag { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 99px; font-size: 10.5px; font-weight: 700; line-height: 18px; letter-spacing: 0.02em; color: var(--accent-fg); background: var(--accent); vertical-align: 1px; white-space: nowrap; }
+/* back on this tab: one soft pulse on the marked row */
+@media (prefers-reduced-motion: no-preference) {
+  .tunes tbody tr.returned.flash { animation: mark-flash 1.5s ease-out; }
+  @keyframes mark-flash { 0%, 30% { background: color-mix(in srgb, var(--accent) 28%, var(--surface)); } 100% { background: var(--accent-soft); } }
+}
 .tunes tbody tr.returned .tune-link:focus-visible { outline: none; text-decoration: underline; }
 
 .tunes td { padding: 5px 10px; }

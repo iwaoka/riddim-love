@@ -63,6 +63,8 @@ const en = {
   somethingWrong: 'Something went wrong.',
   network: 'Network error. Check your connection and try again.',
   tryAgain: 'Try again',
+  /** Tag on the row of the tune last opened (its page, or YouTube / Listen / Dig). */
+  lastOpened: 'Last opened',
 };
 
 export type Strings = typeof en;
@@ -105,6 +107,7 @@ const ja: Partial<Strings> = {
   somethingWrong: '問題が発生しました。',
   network: '通信エラーです。接続を確認してもう一度お試しください。',
   tryAgain: '再試行',
+  lastOpened: '最後に開いた曲',
 };
 
 /** The strings for a language; anything not translated comes from English. */
