@@ -104,6 +104,9 @@ button:hover, select:hover { border-color: var(--fg-3); }
 /* Home: "Just find it." above the search */
 .hero-mark { display: none; margin: 0; font-weight: 800; letter-spacing: -0.015em; line-height: 1.05; white-space: nowrap; }
 body.home .hero-mark { display: block; font-size: clamp(28px, 8.4vw, 60px); }
+/* home: the line under "Just find it." */
+.tagline { display: none; margin: -8px 0 4px; color: var(--fg-2); font-size: clamp(14px, 3.8vw, 17px); letter-spacing: 0.01em; text-align: center; }
+body.home .tagline { display: block; }
 .logo:hover .logo-heart { transform: scale(1.12); }
 .logo-heart { display: block; transform-origin: 50% 60%; }
 @media (prefers-reduced-motion: no-preference) { .logo-heart { transition: transform 0.15s ease; } }
