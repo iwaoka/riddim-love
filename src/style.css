@@ -103,10 +103,10 @@ button:hover, select:hover { border-color: var(--fg-3); }
 .logo .logo-text span, .hero-mark span { color: var(--accent); }
 /* Home: "Just find it." above the search */
 .hero-mark { display: none; margin: 0; font-weight: 800; letter-spacing: -0.015em; line-height: 1.05; white-space: nowrap; }
-body.home .hero-mark { display: block; font-size: clamp(40px, 12.8vw, 76px); }
+body.home .hero-mark { display: block; font-size: clamp(40px, min(12.8vw, 10vh), 76px); } /* vh: smaller on short screens */
 /* home: the line under "Just find it." */
 /* always narrower than "Just find it." above it */
-.tagline { display: none; margin: -8px 0 4px; color: var(--fg-2); font-size: clamp(12px, 3.5vw, 17px); letter-spacing: 0.01em; text-align: center; }
+.tagline { display: none; margin: 10px 0 0; color: var(--fg-2); font-size: clamp(12px, 3.5vw, 17px); letter-spacing: 0.01em; text-align: center; }
 body.home .tagline { display: block; }
 .logo:hover .logo-heart { transform: scale(1.12); }
 .logo-heart { display: block; transform-origin: 50% 60%; }
@@ -143,11 +143,25 @@ body.home .tagline { display: block; }
 .credit { display: none; } /* home only: in the search card. Other pages credit Riddim-ID in their own head */
 
 /* home: big centered search on the canvas */
+/* Home: three rows — the headline sits at the foot of the top row, the search
+   card is the middle row, the hint the head of the bottom row. The two outer
+   rows share the height equally and the padding is the same top and bottom,
+   so the search card's centre is the centre of the screen. The footer is laid
+   over the bottom padding, so it stays in view without moving the card. */
+body.home { position: relative; }
 body.home .top {
   position: static; border: 0; box-shadow: none; background: transparent;
-  flex-direction: column; justify-content: center;
-  flex: 1; padding: 12vh 16px 24px; gap: 16px;
+  display: grid; grid-template-rows: 1fr auto 1fr; justify-items: center; align-items: start;
+  flex: none; box-sizing: border-box; min-height: 100vh; min-height: 100svh;
+  padding: 112px 16px; gap: 16px;
 }
+.hero { display: none; }
+body.home .hero { display: block; grid-row: 1; align-self: end; text-align: center; }
+body.home .search { grid-row: 2; }
+body.home .hint { grid-row: 3; }
+body.home .foot { position: absolute; left: 0; right: 0; bottom: 0; }
+/* short screens (landscape phones, small laptops): less padding, still the same top and bottom */
+@media (max-height: 640px) { body.home .top { padding-top: 98px; padding-bottom: 98px; } }
 /* home: the header logo sits in the top-left corner, like Dig | Want on the right */
 body.home .logo { position: absolute; top: 20px; left: max(16px, calc((100% - 1200px) / 2 + 16px)); }
 body.home .search {
@@ -460,7 +474,7 @@ body.home .foot { background: transparent; border-top-color: var(--line); }
   .names-table .c-note { width: 38%; }
   .tune { padding: 14px; }
 
-  body.home .top { padding-top: calc(8vh + 40px); } /* room for the Want link in the corner */
+  body.home .top { padding: 112px 12px; } /* same top and bottom: keeps the card centred; room for the corner logo / Dig | Want and the footer */
   body.home .search { order: 0; padding: 12px; }
 }
 
