@@ -12,10 +12,13 @@
     "not_found_handling": "404-page",
     // "/" (the HTML shell) runs the Worker for redirects + robots headers;
     // /assets/*, /og.png, /robots.txt, /sitemaps/*.xml stay pure static.
+    // /og/* runs the Worker for the per-page OGP images in R2 (worker/og.ts).
     // /sitemap.xml runs the Worker only to fall back: it serves the pre-built
     // file (`npm run sitemap`) and builds the small one if that is missing.
-    "run_worker_first": ["/api/*", "/", "/sitemap.xml", "/riddim/*", "/artist/*", "/producer/*", "/label/*", "/tune/*", "/want", "/dig"]
+    "run_worker_first": ["/api/*", "/", "/sitemap.xml", "/riddim/*", "/artist/*", "/producer/*", "/label/*", "/tune/*", "/want", "/dig", "/og/*"]
   },
+  // Per-page OGP images, written by scripts/og/generate.mjs (GitHub Actions).
+  "r2_buckets": [{ "binding": "OG", "bucket_name": "riddim-love-og" }],
   "routes": [{ "pattern": "riddim.love", "custom_domain": true }],
   "workers_dev": true,
   "observability": { "enabled": true }

@@ -1,0 +1,62 @@
+# Per-page OGP images → Cloudflare R2 (scripts/og/generate.mjs).
+# Differential: only pages whose name (or the card design) changed are redrawn.
+# Secrets: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+#   (an R2 API token with Object Read & Write on the riddim-love-og bucket only).
+# The weekly run is off until the repository variable OG_SCHEDULE is "on".
+name: OGP images
+
+on:
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: Page kinds (comma separated)
+        default: riddim,artist,producer,label,tune
+        required: true
+      ids:
+        description: Only these ids (comma separated; needs a single kind)
+        default: ''
+      max:
+        description: Stop after this many images (0 = no limit)
+        default: '0'
+      force:
+        description: Redraw even when unchanged
+        type: boolean
+        default: false
+      dry_run:
+        description: Compare only, write nothing
+        type: boolean
+        default: false
+  schedule:
+    - cron: '17 3 * * 1' # Mondays 03:17 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: og-images
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    if: github.event_name == 'workflow_dispatch' || vars.OG_SCHEDULE == 'on'
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Draw and upload
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: riddim-love-og
+          KIND: ${{ inputs.kind || 'riddim,artist,producer,label,tune' }}
+          IDS: ${{ inputs.ids }}
+          MAX: ${{ inputs.max || '0' }}
+          FORCE: ${{ inputs.force && '--force' || '' }}
+          DRY: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: node scripts/og/generate.mjs --kind "$KIND" ${IDS:+--id "$IDS"} --max "$MAX" $FORCE $DRY

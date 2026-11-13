@@ -10,10 +10,18 @@
     "test": "vitest run",
     "deploy": "npm run build && wrangler deploy",
     "deploy:www": "wrangler deploy -c www-redirect/wrangler.jsonc",
-    "sitemap": "node scripts/sitemap.mjs"
+    "sitemap": "node scripts/sitemap.mjs",
+    "og": "node scripts/og/generate.mjs",
+    "og:home": "node scripts/og/home.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261106.1",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/noto-sans-jp": "^5.3.1",
+    "@fontsource/noto-sans-symbols-2": "^5.3.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "opentype.js": "^2.0.0",
+    "satori": "^0.63.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.6",
     "vitest": "^5.1.0",

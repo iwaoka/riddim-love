@@ -23,6 +23,7 @@ import {
   type PageKind,
   type PageMeta,
 } from '../shared/seo';
+import { ogPath, ogTitle, type OgKind } from '../shared/og';
 import type { Entity, Ref, Riddim, SsrData, Tune, TuneList } from '../shared/types';
 import { apiPath, loadEntity, loadRiddim, loadTune, loadTunes } from './data';
 import { UpstreamError, type UpstreamStats } from './upstream';
@@ -108,6 +109,8 @@ interface Built {
   main: string;
   jsonLd: unknown[];
   ssr: SsrData;
+  /** The page's OGP card: its title is the text drawn on the image (shared/og.ts). */
+  og: { kind: OgKind; id: number; title: string };
 }
 
 async function buildRiddim(id: number, ctx: ExecutionContext, stats: UpstreamStats): Promise<Built> {
@@ -145,6 +148,7 @@ async function buildRiddim(id: number, ctx: ExecutionContext, stats: UpstreamSta
       { '@context': 'https://schema.org', '@type': 'CollectionPage', name: meta.h1, url, description: meta.description, ...(r.url ? { sameAs: r.url } : {}), mainEntity: itemList(list) },
     ],
     ssr: { api: { [apiPath.riddim(id)]: r, [apiPath.riddimTunes(id)]: list } },
+    og: { kind: 'riddim', id, title: ogTitle('riddim', r) },
   };
 }
 
@@ -169,6 +173,7 @@ async function buildEntity(kind: 'artist' | 'producer' | 'label', id: number, ct
     main: listHead(kind, meta, facts, e.url) + countLine(list) + tuneTable(list.tunes, { label: kind === 'label' }),
     jsonLd: [crumbs([{ name: meta.h1, url }]), { '@context': 'https://schema.org', ...node }],
     ssr: { api: { [apiPath.tunes(kind, id)]: list } },
+    og: { kind, id, title: ogTitle(kind, e) },
   };
 }
 
@@ -204,6 +209,7 @@ async function buildTune(id: number, ctx: ExecutionContext, stats: UpstreamStats
       },
     ],
     ssr: { api: { [apiPath.tune(id)]: t } },
+    og: { kind: 'tune', id, title: ogTitle('tune', t) },
   };
 }
 
@@ -285,13 +291,26 @@ export async function servePage(
     },
   });
 
+  // OGP image: a URL only, no R2 lookup here (the /og/* route falls back to the
+  // common image when a card is not generated yet). Its ?v= is the card's hash.
+  const og = built.og;
+  const ogImage = og.title ? ORIGIN + ogPath(og.kind, og.id, og.title) : null;
+  const ogAlt = og.title ? `${og.title} — ${SITE}` : null;
+  // A tune shares as "Artist - Title | RIDDIM.LOVE"; its <title> stays as it is.
+  const shareTitle = page.kind === 'tune' && og.title ? `${og.title} | ${SITE}` : meta.title;
+  const keep = { element() {} };
+
   const rewritten = new HTMLRewriter()
     .on('title', { element: (el) => void el.setInnerContent(meta.title) })
     .on('meta[name="description"]', setContent(meta.description))
     .on('link[rel="canonical"]', { element: (el) => void el.setAttribute('href', canonical) })
     .on('meta[property="og:url"]', setContent(canonical))
-    .on('meta[property="og:title"]', setContent(meta.title))
-    .on('meta[name="twitter:title"]', setContent(meta.title))
+    .on('meta[property="og:title"]', setContent(shareTitle))
+    .on('meta[name="twitter:title"]', setContent(shareTitle))
+    .on('meta[property="og:image"]', ogImage ? setContent(ogImage) : keep)
+    .on('meta[name="twitter:image"]', ogImage ? setContent(ogImage) : keep)
+    .on('meta[property="og:image:alt"]', ogAlt ? setContent(ogAlt) : keep)
+    .on('meta[name="twitter:image:alt"]', ogAlt ? setContent(ogAlt) : keep)
     .on('meta[property="og:description"]', setContent(meta.description))
     .on('meta[name="twitter:description"]', setContent(meta.description))
     .on('script[type="application/ld+json"]', {

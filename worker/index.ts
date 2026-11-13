@@ -6,6 +6,8 @@ import { normalizeCountry, type CountryCode } from '../shared/dig';
 import { ORIGIN, PAGE_KINDS, pagePath, parsePagePath, type PageKind } from '../shared/seo';
 import type { ApiError, NameHit, SearchResult, SuggestResult, TuneHit } from '../shared/types';
 import { loadEntity, loadRiddim, loadTune, loadTunes } from './data';
+import { parseOgPath } from '../shared/og';
+import { serveOg } from './og';
 import { servePage } from './pages';
 import * as P from './project';
 import { serveSitemap } from './sitemap';
@@ -24,6 +26,8 @@ import {
 
 export interface Env {
   ASSETS: Fetcher;
+  /** R2 bucket of the per-page OGP images (scripts/og/generate.mjs). */
+  OG?: R2Bucket;
   /** "1" only in local dev (.dev.vars): allows ?country=XX for testing the Dig menu. */
   DEV_COUNTRY_OVERRIDE?: string;
 }
@@ -260,6 +264,8 @@ export default {
       }
       if (url.pathname === '/want') return markVisitor(request, url, env, await serveWant(env, url, request, 'Want list | RIDDIM.LOVE'));
       if (url.pathname === '/dig') return markVisitor(request, url, env, await serveWant(env, url, request, 'Dig history | RIDDIM.LOVE'));
+      const og = parseOgPath(url.pathname);
+      if (og) return serveOg(request, env, ctx, url, og);
       const page = parsePagePath(url.pathname);
       if (page) return markVisitor(request, url, env, await servePage(request, env, ctx, url, page));
       return env.ASSETS.fetch(request);
